@@ -19,7 +19,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public string PreferredLanguage { get; set; } = "1";
 
     /// <summary>
-    /// Gets or sets the preferred provider (VOE, Vidoza, Vidmoly).
+    /// Gets or sets the preferred provider (VOE, Filemoon, Vidoza, Vidmoly).
     /// </summary>
     public string PreferredProvider { get; set; } = "VOE";
 
@@ -32,6 +32,17 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the maximum concurrent downloads.
     /// </summary>
     public int MaxConcurrentDownloads { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the maximum retry attempts for failed downloads.
+    /// </summary>
+    public int MaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets whether to automatically scan the Jellyfin library
+    /// when a download completes.
+    /// </summary>
+    public bool AutoScanLibrary { get; set; } = true;
 
     /// <summary>
     /// Gets or sets whether to automatically organize downloaded files into the Jellyfin library.

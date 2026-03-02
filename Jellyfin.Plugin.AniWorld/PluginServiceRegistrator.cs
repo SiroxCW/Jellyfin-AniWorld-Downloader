@@ -20,5 +20,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IStreamExtractor, VoeExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, VidozaExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, VidmolyExtractor>();
+        serviceCollection.AddSingleton<IStreamExtractor, FilemoonExtractor>();
     }
 }

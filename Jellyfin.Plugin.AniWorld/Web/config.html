@@ -4,7 +4,7 @@
     <title>AniWorld Downloader Settings</title>
 </head>
 <body>
-    <div id="AniWorldConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select">
+    <div id="AniWorldConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
         <div data-role="content">
             <div class="content-primary">
                 <form id="AniWorldConfigForm">
@@ -13,6 +13,8 @@
                     </div>
 
                     <div class="verticalSection">
+                        <h3 class="sectionTitle">Download Settings</h3>
+
                         <div class="inputContainer">
                             <label class="inputLabel" for="txtDownloadPath">Download Path</label>
                             <input is="emby-input" type="text" id="txtDownloadPath"
@@ -37,6 +39,7 @@
                             <label class="inputLabel" for="selProvider">Preferred Provider</label>
                             <select is="emby-select" id="selProvider">
                                 <option value="VOE">VOE (recommended)</option>
+                                <option value="Filemoon">Filemoon</option>
                                 <option value="Vidmoly">Vidmoly</option>
                                 <option value="Vidoza">Vidoza</option>
                             </select>
@@ -47,6 +50,30 @@
                             <label class="inputLabel" for="txtMaxDownloads">Max Concurrent Downloads</label>
                             <input is="emby-input" type="number" id="txtMaxDownloads" min="1" max="5" />
                             <div class="fieldDescription">Maximum number of simultaneous downloads (1-5). Lower values are recommended to avoid rate limiting.</div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Reliability</h3>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtMaxRetries">Max Retry Attempts</label>
+                            <input is="emby-input" type="number" id="txtMaxRetries" min="0" max="10" />
+                            <div class="fieldDescription">
+                                Number of times to retry a failed download (0 = no retries).
+                                Uses exponential backoff between attempts and will try alternative providers on failure.
+                            </div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkAutoScan" />
+                                <span>Auto-scan library after download</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Automatically trigger a Jellyfin library scan when a download completes.
+                                This makes new episodes appear in your library immediately.
+                            </div>
                         </div>
                     </div>
 

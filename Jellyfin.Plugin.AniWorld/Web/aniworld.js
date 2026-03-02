@@ -86,7 +86,6 @@ const AW = {
         var content = document.getElementById('aw-content');
         var html = '<button class="aw-btn aw-btn-secondary aw-back" onclick="AW.goBack()">← Back to Results</button>';
 
-        // Header with cover + info
         html += '<div class="aw-series">';
         if (series.CoverImageUrl) {
             html += '<img class="aw-cover" src="' + esc(series.CoverImageUrl) + '" alt="Cover" onerror="this.style.display=\'none\'" />';
@@ -112,7 +111,6 @@ const AW = {
         }
         html += '</div></div>';
 
-        // Season buttons
         if (series.Seasons && series.Seasons.length > 0) {
             html += '<div class="aw-seasons">';
             series.Seasons.forEach(function (season, idx) {
@@ -130,7 +128,6 @@ const AW = {
         html += '<div id="aw-episodes"></div>';
         content.innerHTML = html;
 
-        // Load first season
         if (series.Seasons && series.Seasons.length > 0) {
             AW.loadSeason(encodeURIComponent(series.Seasons[0].Url));
         }
@@ -173,7 +170,6 @@ const AW = {
             return;
         }
 
-        // Season action bar
         if (barContainer) {
             var bar = '<div class="aw-season-actions">';
             bar += '<span class="aw-ep-count">' + episodes.length + ' episode' + (episodes.length === 1 ? '' : 's') + '</span>';
@@ -199,12 +195,11 @@ const AW = {
         html += '</div>';
         epContainer.innerHTML = html;
 
-        // Fetch titles for each episode (in background, staggered)
         episodes.forEach(function (ep, idx) {
             var epId = 'ep-' + ep.Number + '-' + (ep.IsMovie ? 'movie' : 'ep');
             setTimeout(function () {
                 AW.fetchEpisodeTitle(ep.Url, epId);
-            }, idx * 150); // Stagger to avoid rate limiting
+            }, idx * 150);
         });
     },
 
@@ -335,8 +330,6 @@ const AW = {
 
     // ── Downloads Tab ──
     loadDownloads: function () {
-        var container = document.getElementById('aw-downloads');
-
         ApiClient.fetch({
             url: ApiClient.getUrl('AniWorld/Downloads'),
             type: 'GET',
@@ -344,7 +337,8 @@ const AW = {
         }).then(function (downloads) {
             AW.renderDownloads(downloads);
         }).catch(function () {
-            container.innerHTML = '<div class="aw-empty">Failed to load downloads.</div>';
+            var container = document.getElementById('aw-downloads');
+            if (container) container.innerHTML = '<div class="aw-empty">Failed to load downloads.</div>';
         });
     },
 
@@ -352,11 +346,10 @@ const AW = {
         var container = document.getElementById('aw-downloads');
         if (!container) return;
 
-        // Count active
         var active = 0;
         if (downloads) {
             downloads.forEach(function (dl) {
-                if (['Queued', 'Resolving', 'Extracting', 'Downloading'].indexOf(dl.Status) !== -1) {
+                if (['Queued', 'Resolving', 'Extracting', 'Downloading', 'Retrying'].indexOf(dl.Status) !== -1) {
                     active++;
                 }
             });
@@ -381,15 +374,26 @@ const AW = {
         html += '<div class="aw-dl">';
         downloads.forEach(function (dl) {
             var statusCls = 'aw-status-' + dl.Status.toLowerCase();
-            var isActive = ['Queued', 'Resolving', 'Extracting', 'Downloading'].indexOf(dl.Status) !== -1;
+            var isActive = ['Queued', 'Resolving', 'Extracting', 'Downloading', 'Retrying'].indexOf(dl.Status) !== -1;
+            var isFailed = dl.Status === 'Failed';
             var fileName = dl.OutputPath ? dl.OutputPath.split('/').pop().split('\\').pop() : dl.Id;
 
             html += '<div class="aw-dl-item">';
             html += '<div class="aw-dl-info">';
             html += '<strong>' + esc(dl.EpisodeTitle || fileName) + '</strong>';
-            html += '<small>' + esc(dl.Provider) + ' · ' + esc(dl.Status) + (dl.Error ? ' · ' + esc(dl.Error) : '') + '</small>';
-            if (dl.Error) {
+            html += '<small>' + esc(dl.Provider) + ' · ' + esc(dl.Status);
+            if (dl.RetryCount > 0) {
+                html += ' (retry ' + dl.RetryCount + '/' + dl.MaxRetries + ')';
+            }
+            if (dl.FileSizeBytes > 0) {
+                html += '<span class="aw-dl-size">' + formatSize(dl.FileSizeBytes) + '</span>';
+            }
+            html += '</small>';
+            if (dl.Error && dl.Status !== 'Retrying') {
                 html += '<div class="aw-dl-error">' + esc(dl.Error) + '</div>';
+            }
+            if (dl.Status === 'Retrying' && dl.Error) {
+                html += '<div class="aw-dl-retry-info">⏳ ' + esc(dl.Error) + '</div>';
             }
             html += '</div>';
 
@@ -397,9 +401,14 @@ const AW = {
             html += '<span class="aw-dl-pct">' + dl.Progress + '%</span>';
             html += '<span class="aw-status ' + statusCls + '">' + esc(dl.Status) + '</span>';
 
+            html += '<div class="aw-dl-btns">';
             if (isActive) {
-                html += '<button class="aw-btn aw-btn-danger aw-btn-sm" onclick="AW.cancelDownload(\'' + dl.Id + '\')">✕</button>';
+                html += '<button class="aw-btn aw-btn-danger aw-btn-sm" onclick="AW.cancelDownload(\'' + dl.Id + '\')" title="Cancel">✕</button>';
             }
+            if (isFailed) {
+                html += '<button class="aw-btn aw-btn-warning aw-btn-sm" onclick="AW.retryDownload(\'' + dl.Id + '\')" title="Retry">🔄</button>';
+            }
+            html += '</div>';
 
             html += '</div>';
         });
@@ -414,6 +423,18 @@ const AW = {
             type: 'DELETE'
         }).then(function () {
             AW.loadDownloads();
+        });
+    },
+
+    retryDownload: function (id) {
+        ApiClient.fetch({
+            url: ApiClient.getUrl('AniWorld/Downloads/' + id + '/Retry'),
+            type: 'POST'
+        }).then(function () {
+            Dashboard.alert('Retrying download...');
+            AW.loadDownloads();
+        }).catch(function (err) {
+            Dashboard.alert('Retry failed: ' + (err.message || 'Unknown error'));
         });
     },
 
@@ -471,6 +492,13 @@ function esc(str) {
     return d.innerHTML;
 }
 
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
 // Bind Enter key to search
 document.getElementById('aw-search-input').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') {
@@ -489,7 +517,7 @@ setInterval(function () {
         var active = 0;
         if (downloads) {
             downloads.forEach(function (dl) {
-                if (['Queued', 'Resolving', 'Extracting', 'Downloading'].indexOf(dl.Status) !== -1) {
+                if (['Queued', 'Resolving', 'Extracting', 'Downloading', 'Retrying'].indexOf(dl.Status) !== -1) {
                     active++;
                 }
             });

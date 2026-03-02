@@ -25,6 +25,8 @@
         .aw-btn-success:hover { background: #45a049; }
         .aw-btn-danger { background: #f44336; color: white; }
         .aw-btn-danger:hover { background: #e53935; }
+        .aw-btn-warning { background: #ff9800; color: white; }
+        .aw-btn-warning:hover { background: #f57c00; }
         .aw-btn-secondary { background: rgba(255,255,255,0.1); color: inherit; }
         .aw-btn-secondary:hover { background: rgba(255,255,255,0.18); }
         .aw-btn-sm { padding: 0.3em 0.7em; font-size: 0.8em; }
@@ -82,9 +84,14 @@
         .aw-status-failed { background: rgba(244,67,54,0.25); color: #ef5350; }
         .aw-status-queued { background: rgba(255,152,0,0.25); color: #ffb74d; }
         .aw-status-resolving, .aw-status-extracting { background: rgba(156,39,176,0.25); color: #ce93d8; }
+        .aw-status-retrying { background: rgba(255,152,0,0.25); color: #ffb74d; animation: aw-pulse 1.5s infinite; }
         .aw-status-cancelled { background: rgba(158,158,158,0.25); color: #bdbdbd; }
+        @keyframes aw-pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
         .aw-dl-error { color: #ef5350; font-size: 0.8em; margin-top: 0.3em; }
+        .aw-dl-retry-info { color: #ffb74d; font-size: 0.78em; margin-top: 0.2em; }
+        .aw-dl-size { opacity: 0.5; font-size: 0.78em; margin-left: 0.5em; }
         .aw-dl-actions { display: flex; gap: 0.3em; margin-top: 1em; }
+        .aw-dl-btns { display: flex; gap: 0.3em; flex-shrink: 0; }
 
         /* Utility */
         .aw-empty { text-align: center; padding: 3em; opacity: 0.4; }

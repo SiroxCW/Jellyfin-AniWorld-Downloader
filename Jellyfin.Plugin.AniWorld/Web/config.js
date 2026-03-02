@@ -8,6 +8,8 @@ var AniWorldConfig = {
             document.getElementById('selLanguage').value = config.PreferredLanguage || '1';
             document.getElementById('selProvider').value = config.PreferredProvider || 'VOE';
             document.getElementById('txtMaxDownloads').value = config.MaxConcurrentDownloads || 2;
+            document.getElementById('txtMaxRetries').value = config.MaxRetries != null ? config.MaxRetries : 3;
+            document.getElementById('chkAutoScan').checked = config.AutoScanLibrary !== false;
             Dashboard.hideLoadingMsg();
         });
     },
@@ -19,6 +21,8 @@ var AniWorldConfig = {
             config.PreferredLanguage = document.getElementById('selLanguage').value;
             config.PreferredProvider = document.getElementById('selProvider').value;
             config.MaxConcurrentDownloads = parseInt(document.getElementById('txtMaxDownloads').value, 10) || 2;
+            config.MaxRetries = parseInt(document.getElementById('txtMaxRetries').value, 10) || 0;
+            config.AutoScanLibrary = document.getElementById('chkAutoScan').checked;
 
             ApiClient.updatePluginConfiguration(AniWorldConfig.pluginId, config).then(function () {
                 Dashboard.processPluginConfigurationUpdateResult();

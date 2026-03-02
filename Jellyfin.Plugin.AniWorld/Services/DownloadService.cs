@@ -9,17 +9,24 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.AniWorld.Extractors;
+using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AniWorld.Services;
 
 /// <summary>
 /// Manages downloads from aniworld.to using ffmpeg.
+/// Supports retry with exponential backoff, provider fallback,
+/// and automatic Jellyfin library scanning after completion.
 /// </summary>
 public class DownloadService
 {
+    private const int DefaultMaxRetries = 3;
+    private const int BaseRetryDelayMs = 3000;
+
     private readonly AniWorldService _aniWorldService;
     private readonly IEnumerable<IStreamExtractor> _extractors;
+    private readonly ILibraryMonitor _libraryMonitor;
     private readonly ILogger<DownloadService> _logger;
     private readonly ConcurrentDictionary<string, DownloadTask> _activeTasks = new();
     private readonly SemaphoreSlim _downloadSemaphore;
@@ -27,16 +34,15 @@ public class DownloadService
     /// <summary>
     /// Initializes a new instance of the <see cref="DownloadService"/> class.
     /// </summary>
-    /// <param name="aniWorldService">AniWorld service.</param>
-    /// <param name="extractors">Available stream extractors.</param>
-    /// <param name="logger">Logger instance.</param>
     public DownloadService(
         AniWorldService aniWorldService,
         IEnumerable<IStreamExtractor> extractors,
+        ILibraryMonitor libraryMonitor,
         ILogger<DownloadService> logger)
     {
         _aniWorldService = aniWorldService;
         _extractors = extractors;
+        _libraryMonitor = libraryMonitor;
         _logger = logger;
 
         var maxDownloads = Plugin.Instance?.Configuration.MaxConcurrentDownloads ?? 2;
@@ -46,7 +52,6 @@ public class DownloadService
     /// <summary>
     /// Gets all active download tasks.
     /// </summary>
-    /// <returns>List of active downloads.</returns>
     public List<DownloadTask> GetActiveDownloads()
     {
         return _activeTasks.Values.ToList();
@@ -55,8 +60,6 @@ public class DownloadService
     /// <summary>
     /// Gets a specific download task by ID.
     /// </summary>
-    /// <param name="taskId">The task ID.</param>
-    /// <returns>The download task, or null.</returns>
     public DownloadTask? GetDownload(string taskId)
     {
         _activeTasks.TryGetValue(taskId, out var task);
@@ -66,12 +69,6 @@ public class DownloadService
     /// <summary>
     /// Starts a download for an episode.
     /// </summary>
-    /// <param name="episodeUrl">The aniworld.to episode URL.</param>
-    /// <param name="languageKey">Language key (1, 2, or 3).</param>
-    /// <param name="provider">Provider name (VOE, Vidoza, Vidmoly).</param>
-    /// <param name="outputPath">The output file path.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The download task ID.</returns>
     public Task<string> StartDownloadAsync(
         string episodeUrl,
         string languageKey,
@@ -89,12 +86,13 @@ public class DownloadService
             OutputPath = outputPath,
             Status = DownloadStatus.Queued,
             StartedAt = DateTime.UtcNow,
+            MaxRetries = Plugin.Instance?.Configuration.MaxRetries ?? DefaultMaxRetries,
         };
 
         _activeTasks[taskId] = task;
 
         // Run in background
-        _ = Task.Run(async () => await ExecuteDownloadAsync(task, cancellationToken).ConfigureAwait(false), cancellationToken);
+        _ = Task.Run(async () => await ExecuteDownloadWithRetryAsync(task, cancellationToken).ConfigureAwait(false), cancellationToken);
 
         return Task.FromResult(taskId);
     }
@@ -102,8 +100,6 @@ public class DownloadService
     /// <summary>
     /// Cancels a download.
     /// </summary>
-    /// <param name="taskId">The task ID.</param>
-    /// <returns>True if cancelled.</returns>
     public bool CancelDownload(string taskId)
     {
         if (_activeTasks.TryGetValue(taskId, out var task))
@@ -119,8 +115,6 @@ public class DownloadService
     /// <summary>
     /// Removes a completed/failed/cancelled download from the list.
     /// </summary>
-    /// <param name="taskId">The task ID.</param>
-    /// <returns>True if removed.</returns>
     public bool RemoveDownload(string taskId)
     {
         if (_activeTasks.TryRemove(taskId, out var task))
@@ -137,9 +131,8 @@ public class DownloadService
     }
 
     /// <summary>
-    /// Clears all completed, failed, and cancelled downloads from the list.
+    /// Clears all completed, failed, and cancelled downloads.
     /// </summary>
-    /// <returns>Number of cleared tasks.</returns>
     public int ClearCompleted()
     {
         var toRemove = _activeTasks.Values
@@ -155,14 +148,116 @@ public class DownloadService
         return toRemove.Count;
     }
 
-    private async Task ExecuteDownloadAsync(DownloadTask task, CancellationToken externalToken)
+    /// <summary>
+    /// Retries a failed download.
+    /// </summary>
+    public bool RetryDownload(string taskId)
+    {
+        if (_activeTasks.TryGetValue(taskId, out var task) &&
+            task.Status is DownloadStatus.Failed)
+        {
+            task.Status = DownloadStatus.Queued;
+            task.Error = null;
+            task.RetryCount = 0;
+            task.Progress = 0;
+
+            _ = Task.Run(async () => await ExecuteDownloadWithRetryAsync(task, CancellationToken.None).ConfigureAwait(false));
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Wraps the download execution with retry logic and exponential backoff.
+    /// </summary>
+    private async Task ExecuteDownloadWithRetryAsync(DownloadTask task, CancellationToken externalToken)
     {
         task.CancellationSource = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
         var token = task.CancellationSource.Token;
 
+        var maxRetries = task.MaxRetries;
+
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            if (token.IsCancellationRequested)
+            {
+                task.Status = DownloadStatus.Cancelled;
+                return;
+            }
+
+            if (attempt > 0)
+            {
+                task.RetryCount = attempt;
+                var delayMs = BaseRetryDelayMs * (int)Math.Pow(2, attempt - 1);
+                task.Status = DownloadStatus.Retrying;
+                task.Error = $"Retry {attempt}/{maxRetries} in {delayMs / 1000}s...";
+                _logger.LogInformation("Retry {Attempt}/{MaxRetries} for {Url} in {Delay}ms",
+                    attempt, maxRetries, task.EpisodeUrl, delayMs);
+
+                try
+                {
+                    await Task.Delay(delayMs, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    task.Status = DownloadStatus.Cancelled;
+                    return;
+                }
+
+                task.Error = null;
+                task.Progress = 0;
+            }
+
+            try
+            {
+                await ExecuteDownloadAsync(task, token).ConfigureAwait(false);
+
+                if (task.Status == DownloadStatus.Completed)
+                {
+                    // Trigger library scan for the downloaded file
+                    TriggerLibraryScan(task.OutputPath);
+                    return;
+                }
+
+                if (task.Status == DownloadStatus.Cancelled)
+                {
+                    return;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                task.Status = DownloadStatus.Cancelled;
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Download attempt {Attempt}/{MaxRetries} failed for {Url}",
+                    attempt + 1, maxRetries + 1, task.EpisodeUrl);
+                task.Error = ex.Message;
+
+                if (attempt >= maxRetries)
+                {
+                    task.Status = DownloadStatus.Failed;
+                    task.Error = $"Failed after {maxRetries + 1} attempts: {ex.Message}";
+                    _logger.LogError(ex, "Download permanently failed for {Url} after {Attempts} attempts",
+                        task.EpisodeUrl, maxRetries + 1);
+
+                    // Clean up partial file
+                    CleanupPartialFile(task.OutputPath);
+                    return;
+                }
+            }
+        }
+    }
+
+    private async Task ExecuteDownloadAsync(DownloadTask task, CancellationToken token)
+    {
+        bool semaphoreAcquired = false;
         try
         {
             await _downloadSemaphore.WaitAsync(token).ConfigureAwait(false);
+            semaphoreAcquired = true;
             task.Status = DownloadStatus.Resolving;
 
             // 1. Get episode details
@@ -172,9 +267,17 @@ public class DownloadService
             if (!details.ProvidersByLanguage.TryGetValue(task.Language, out var providers) ||
                 !providers.TryGetValue(task.Provider, out var redirectUrl))
             {
-                task.Status = DownloadStatus.Failed;
-                task.Error = $"Provider {task.Provider} not available for language key {task.Language}";
-                return;
+                // Try to fallback to another provider
+                var fallbackResult = TryFindFallbackProvider(details, task.Language, task.Provider);
+                if (fallbackResult == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Provider {task.Provider} not available for language key {task.Language}, and no fallback found");
+                }
+
+                redirectUrl = fallbackResult.Value.url;
+                task.Provider = fallbackResult.Value.provider;
+                _logger.LogInformation("Falling back to provider {Provider} for {Url}", task.Provider, task.EpisodeUrl);
             }
 
             // 2. Resolve redirect to provider embed URL
@@ -187,9 +290,7 @@ public class DownloadService
 
             if (extractor == null)
             {
-                task.Status = DownloadStatus.Failed;
-                task.Error = $"No extractor available for provider: {task.Provider}";
-                return;
+                throw new InvalidOperationException($"No extractor available for provider: {task.Provider}");
             }
 
             task.Status = DownloadStatus.Extracting;
@@ -197,9 +298,7 @@ public class DownloadService
 
             if (string.IsNullOrEmpty(streamUrl))
             {
-                task.Status = DownloadStatus.Failed;
-                task.Error = "Failed to extract stream URL from provider";
-                return;
+                throw new InvalidOperationException("Failed to extract stream URL from provider");
             }
 
             _logger.LogInformation("Stream URL: {StreamUrl}", streamUrl);
@@ -223,24 +322,121 @@ public class DownloadService
                 return;
             }
 
+            // Verify the file exists and has content
+            var fileInfo = new FileInfo(task.OutputPath);
+            if (!fileInfo.Exists || fileInfo.Length < 1024)
+            {
+                throw new InvalidOperationException(
+                    $"Downloaded file is missing or too small ({fileInfo.Length} bytes)");
+            }
+
             task.Status = DownloadStatus.Completed;
             task.CompletedAt = DateTime.UtcNow;
             task.Progress = 100;
-            _logger.LogInformation("Download completed: {Path}", task.OutputPath);
-        }
-        catch (OperationCanceledException)
-        {
-            task.Status = DownloadStatus.Cancelled;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Download failed for {Url}", task.EpisodeUrl);
-            task.Status = DownloadStatus.Failed;
-            task.Error = ex.Message;
+            task.FileSizeBytes = fileInfo.Length;
+            _logger.LogInformation("Download completed: {Path} ({Size} bytes)", task.OutputPath, fileInfo.Length);
         }
         finally
         {
-            _downloadSemaphore.Release();
+            if (semaphoreAcquired)
+            {
+                _downloadSemaphore.Release();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tries to find a fallback provider when the preferred one is unavailable.
+    /// Checks known extractors in order of preference: VOE, Filemoon, Vidmoly, Vidoza.
+    /// </summary>
+    private (string provider, string url)? TryFindFallbackProvider(
+        EpisodeDetails details,
+        string language,
+        string excludeProvider)
+    {
+        if (!details.ProvidersByLanguage.TryGetValue(language, out var providers))
+        {
+            return null;
+        }
+
+        // Priority order for fallback
+        var providerPriority = new[] { "VOE", "Filemoon", "Vidmoly", "Vidoza" };
+        var extractorNames = _extractors.Select(e => e.ProviderName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var prov in providerPriority)
+        {
+            if (prov.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (providers.TryGetValue(prov, out var url) &&
+                extractorNames.Contains(prov))
+            {
+                return (prov, url);
+            }
+        }
+
+        // Try any available provider we have an extractor for
+        foreach (var (name, url) in providers)
+        {
+            if (!name.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase) &&
+                extractorNames.Contains(name))
+            {
+                return (name, url);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Triggers a Jellyfin library scan for the directory containing the downloaded file.
+    /// </summary>
+    private void TriggerLibraryScan(string filePath)
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config?.AutoScanLibrary != true)
+        {
+            _logger.LogDebug("Auto library scan disabled, skipping");
+            return;
+        }
+
+        try
+        {
+            var directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                _libraryMonitor.ReportFileSystemChanged(directory);
+                _logger.LogInformation("Triggered library scan for: {Directory}", directory);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to trigger library scan for {Path}", filePath);
+        }
+    }
+
+    /// <summary>
+    /// Cleans up a partial/failed download file.
+    /// </summary>
+    private void CleanupPartialFile(string filePath)
+    {
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                var fileInfo = new FileInfo(filePath);
+                if (fileInfo.Length < 1024)
+                {
+                    File.Delete(filePath);
+                    _logger.LogDebug("Cleaned up partial file: {Path}", filePath);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to cleanup partial file: {Path}", filePath);
         }
     }
 
@@ -252,8 +448,9 @@ public class DownloadService
             throw new InvalidOperationException("ffmpeg not found. Please ensure ffmpeg is installed.");
         }
 
-        // Build ffmpeg command for HLS download
-        var args = $"-i \"{task.StreamUrl}\" -c copy -bsf:a aac_adtstoasc -y \"{task.OutputPath}\"";
+        // Build ffmpeg command - use -reconnect flags for more reliable HLS downloads
+        var args = $"-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 " +
+                   $"-i \"{task.StreamUrl}\" -c copy -bsf:a aac_adtstoasc -y \"{task.OutputPath}\"";
 
         _logger.LogDebug("Running: {Ffmpeg} {Args}", ffmpegPath, args);
 
@@ -275,6 +472,7 @@ public class DownloadService
         // Parse ffmpeg progress from stderr
         var progressPattern = new Regex(@"time=(?<time>\d+:\d+:\d+\.\d+)", RegexOptions.Compiled);
         var durationPattern = new Regex(@"Duration:\s*(?<dur>\d+:\d+:\d+\.\d+)", RegexOptions.Compiled);
+        var sizePattern = new Regex(@"size=\s*(?<size>\d+)kB", RegexOptions.Compiled);
         TimeSpan? totalDuration = null;
 
         _ = Task.Run(async () =>
@@ -298,13 +496,32 @@ public class DownloadService
                 {
                     if (totalDuration.HasValue && totalDuration.Value.TotalSeconds > 0)
                     {
-                        task.Progress = (int)(currentTime.TotalSeconds / totalDuration.Value.TotalSeconds * 100);
+                        task.Progress = Math.Min(99, (int)(currentTime.TotalSeconds / totalDuration.Value.TotalSeconds * 100));
                     }
+                }
+
+                // Track download size
+                var sizeMatch = sizePattern.Match(line);
+                if (sizeMatch.Success && long.TryParse(sizeMatch.Groups["size"].Value, out var sizeKb))
+                {
+                    task.FileSizeBytes = sizeKb * 1024;
                 }
             }
         }, cancellationToken);
 
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+
+            throw;
+        }
 
         if (process.ExitCode != 0)
         {
@@ -314,7 +531,6 @@ public class DownloadService
 
     private static string? FindFfmpeg()
     {
-        // Check common locations
         var paths = new[]
         {
             "/usr/lib/jellyfin-ffmpeg/ffmpeg",
@@ -331,7 +547,6 @@ public class DownloadService
             }
         }
 
-        // Try PATH
         try
         {
             var process = Process.Start(new ProcessStartInfo
@@ -402,6 +617,15 @@ public class DownloadTask
     /// <summary>Gets or sets the completed timestamp.</summary>
     public DateTime? CompletedAt { get; set; }
 
+    /// <summary>Gets or sets the retry count.</summary>
+    public int RetryCount { get; set; }
+
+    /// <summary>Gets or sets the max retries allowed.</summary>
+    public int MaxRetries { get; set; }
+
+    /// <summary>Gets or sets the file size in bytes.</summary>
+    public long FileSizeBytes { get; set; }
+
     /// <summary>Gets or sets the cancellation token source.</summary>
     [JsonIgnore]
     public CancellationTokenSource? CancellationSource { get; set; }
@@ -424,7 +648,7 @@ public enum DownloadStatus
     /// <summary>Downloading with ffmpeg.</summary>
     Downloading,
 
-    /// <summary>Download completed.</summary>
+    /// <summary>Completed successfully.</summary>
     Completed,
 
     /// <summary>Download failed.</summary>
@@ -432,4 +656,7 @@ public enum DownloadStatus
 
     /// <summary>Download cancelled.</summary>
     Cancelled,
+
+    /// <summary>Waiting to retry after failure.</summary>
+    Retrying,
 }

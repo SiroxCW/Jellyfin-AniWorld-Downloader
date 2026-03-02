@@ -266,6 +266,22 @@ public class AniWorldController : ControllerBase
     }
 
     /// <summary>
+    /// Retry a failed download.
+    /// </summary>
+    [HttpPost("Downloads/{id}/Retry")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult RetryDownload(string id)
+    {
+        if (_downloadService.RetryDownload(id))
+        {
+            return Ok(new { success = true });
+        }
+
+        return NotFound(new { error = "Download not found or not in failed state" });
+    }
+
+    /// <summary>
     /// Builds a Jellyfin-compatible output path from the episode URL.
     /// Format: basePath/SeriesName/Season XX/SeriesName - SXXEXX.mkv
     /// For movies: basePath/SeriesName/Specials/SeriesName - S00EXX.mkv
