@@ -47,6 +47,21 @@
                         </div>
 
                         <div class="inputContainer">
+                            <label class="inputLabel" for="selFallbackProvider">Fallback Provider</label>
+                            <select is="emby-select" id="selFallbackProvider">
+                                <option value="">None (no fallback)</option>
+                                <option value="VOE">VOE</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">
+                                If all retries with the preferred provider fail, the download will be retried
+                                with this provider. Ignored if set to the same as the preferred provider.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
                             <label class="inputLabel" for="txtMaxDownloads">Max Concurrent Downloads</label>
                             <input is="emby-input" type="number" id="txtMaxDownloads" min="1" max="5" />
                             <div class="fieldDescription">Maximum number of simultaneous downloads (1-5). Lower values are recommended to avoid rate limiting.</div>

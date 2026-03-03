@@ -24,6 +24,14 @@ public class PluginConfiguration : BasePluginConfiguration
     public string PreferredProvider { get; set; } = "VOE";
 
     /// <summary>
+    /// Gets or sets the fallback provider. After all retries with the primary provider fail,
+    /// the download will be attempted again using this provider.
+    /// Set to "None" or empty to disable fallback.
+    /// If fallback equals the primary provider, fallback is skipped.
+    /// </summary>
+    public string FallbackProvider { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the naming template for downloaded files.
     /// </summary>
     public string NamingTemplate { get; set; } = "{title} ({year})/{title} S{season}E{episode}.mkv";

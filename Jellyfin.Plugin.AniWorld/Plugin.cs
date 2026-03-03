@@ -53,6 +53,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             {
                 Name = "AniWorldDownloader",
                 EmbeddedResourcePath = $"{GetType().Namespace}.Web.aniworld.html",
+                EnableInMainMenu = true,
+                MenuSection = "server",
+                MenuIcon = "download",
+                DisplayName = "AniWorld Downloader",
             },
             new PluginPageInfo
             {

@@ -210,13 +210,70 @@ public class DownloadService
     }
 
     /// <summary>
-    /// Wraps the download execution with retry logic and exponential backoff.
+    /// Wraps the download execution with retry logic, exponential backoff, and provider fallback.
+    /// After all retries fail with the primary provider, if a different fallback provider is
+    /// configured, retries the entire cycle with the fallback provider.
     /// </summary>
     private async Task ExecuteDownloadWithRetryAsync(DownloadTask task, CancellationToken externalToken)
     {
         task.CancellationSource = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
         var token = task.CancellationSource.Token;
 
+        var originalProvider = task.Provider;
+        var lastError = string.Empty;
+
+        // Try primary provider first, then fallback if configured
+        if (!await TryDownloadWithRetriesAsync(task, token).ConfigureAwait(false))
+        {
+            // Primary provider exhausted all retries — try fallback
+            var config = Plugin.Instance?.Configuration;
+            var fallbackProvider = config?.FallbackProvider ?? string.Empty;
+
+            if (!string.IsNullOrEmpty(fallbackProvider) &&
+                !fallbackProvider.Equals("None", StringComparison.OrdinalIgnoreCase) &&
+                !fallbackProvider.Equals(originalProvider, StringComparison.OrdinalIgnoreCase) &&
+                task.Status == DownloadStatus.Failed)
+            {
+                lastError = task.Error ?? string.Empty;
+                _logger.LogInformation(
+                    "Primary provider {Primary} failed for {Url}. Trying fallback provider {Fallback}",
+                    originalProvider, task.EpisodeUrl, fallbackProvider);
+
+                // Reset task for fallback attempt
+                task.Provider = fallbackProvider;
+                task.Status = DownloadStatus.Queued;
+                task.RetryCount = 0;
+                task.Progress = 0;
+                task.Error = $"Falling back to {fallbackProvider}...";
+                _historyService.UpdateDownload(task);
+
+                // Clean up any partial file from primary attempt
+                CleanupFileOnCancel(task.OutputPath);
+
+                if (await TryDownloadWithRetriesAsync(task, token).ConfigureAwait(false))
+                {
+                    return; // Fallback succeeded
+                }
+
+                // Both providers failed
+                task.Error = $"Failed with {originalProvider} and fallback {fallbackProvider}: {task.Error}";
+                _historyService.UpdateDownload(task);
+            }
+
+            // Final cleanup
+            if (task.Status == DownloadStatus.Failed)
+            {
+                CleanupPartialFile(task.OutputPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Attempts to download with the current task.Provider, retrying up to MaxRetries times.
+    /// Returns true if download completed successfully, false if all retries exhausted.
+    /// </summary>
+    private async Task<bool> TryDownloadWithRetriesAsync(DownloadTask task, CancellationToken token)
+    {
         var maxRetries = task.MaxRetries;
 
         for (int attempt = 0; attempt <= maxRetries; attempt++)
@@ -226,7 +283,7 @@ public class DownloadService
                 task.Status = DownloadStatus.Cancelled;
                 _historyService.UpdateDownload(task);
                 CleanupFileOnCancel(task.OutputPath);
-                return;
+                return true; // "handled" — don't try fallback
             }
 
             if (attempt > 0)
@@ -234,10 +291,10 @@ public class DownloadService
                 task.RetryCount = attempt;
                 var delayMs = BaseRetryDelayMs * (int)Math.Pow(2, attempt - 1);
                 task.Status = DownloadStatus.Retrying;
-                task.Error = $"Retry {attempt}/{maxRetries} in {delayMs / 1000}s...";
+                task.Error = $"Retry {attempt}/{maxRetries} ({task.Provider}) in {delayMs / 1000}s...";
                 _historyService.UpdateDownload(task);
-                _logger.LogInformation("Retry {Attempt}/{MaxRetries} for {Url} in {Delay}ms",
-                    attempt, maxRetries, task.EpisodeUrl, delayMs);
+                _logger.LogInformation("Retry {Attempt}/{MaxRetries} for {Url} with {Provider} in {Delay}ms",
+                    attempt, maxRetries, task.EpisodeUrl, task.Provider, delayMs);
 
                 try
                 {
@@ -248,7 +305,7 @@ public class DownloadService
                     task.Status = DownloadStatus.Cancelled;
                     _historyService.UpdateDownload(task);
                     CleanupFileOnCancel(task.OutputPath);
-                    return;
+                    return true; // handled
                 }
 
                 task.Error = null;
@@ -263,14 +320,14 @@ public class DownloadService
                 {
                     _historyService.UpdateDownload(task);
                     TriggerLibraryScan(task.OutputPath);
-                    return;
+                    return true;
                 }
 
                 if (task.Status == DownloadStatus.Cancelled)
                 {
                     _historyService.UpdateDownload(task);
                     CleanupFileOnCancel(task.OutputPath);
-                    return;
+                    return true; // handled
                 }
             }
             catch (OperationCanceledException)
@@ -278,27 +335,27 @@ public class DownloadService
                 task.Status = DownloadStatus.Cancelled;
                 _historyService.UpdateDownload(task);
                 CleanupFileOnCancel(task.OutputPath);
-                return;
+                return true; // handled
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Download attempt {Attempt}/{MaxRetries} failed for {Url}",
-                    attempt + 1, maxRetries + 1, task.EpisodeUrl);
+                _logger.LogWarning(ex, "Download attempt {Attempt}/{MaxRetries} failed for {Url} with {Provider}",
+                    attempt + 1, maxRetries + 1, task.EpisodeUrl, task.Provider);
                 task.Error = ex.Message;
 
                 if (attempt >= maxRetries)
                 {
                     task.Status = DownloadStatus.Failed;
-                    task.Error = $"Failed after {maxRetries + 1} attempts: {ex.Message}";
+                    task.Error = $"Failed after {maxRetries + 1} attempts with {task.Provider}: {ex.Message}";
                     _historyService.UpdateDownload(task);
-                    _logger.LogError(ex, "Download permanently failed for {Url} after {Attempts} attempts",
-                        task.EpisodeUrl, maxRetries + 1);
-
-                    CleanupPartialFile(task.OutputPath);
-                    return;
+                    _logger.LogError(ex, "Download failed for {Url} after {Attempts} attempts with {Provider}",
+                        task.EpisodeUrl, maxRetries + 1, task.Provider);
+                    return false; // exhausted — caller may try fallback
                 }
             }
         }
+
+        return false;
     }
 
     private async Task ExecuteDownloadAsync(DownloadTask task, CancellationToken token)
