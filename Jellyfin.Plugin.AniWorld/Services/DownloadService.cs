@@ -547,6 +547,7 @@ public class DownloadService
 
     /// <summary>
     /// Cleans up a partial/failed download file (only removes very small stubs).
+    /// Also cleans up empty parent directories if the file was removed.
     /// </summary>
     private void CleanupPartialFile(string filePath)
     {
@@ -559,6 +560,7 @@ public class DownloadService
                 {
                     File.Delete(filePath);
                     _logger.LogDebug("Cleaned up partial file: {Path}", filePath);
+                    CleanupEmptyParentDirectories(filePath);
                 }
             }
         }
@@ -571,22 +573,88 @@ public class DownloadService
     /// <summary>
     /// Cleans up a file on cancellation — removes regardless of size since
     /// a cancelled download is always incomplete/unwanted.
+    /// Also removes empty parent directories (season folder, series folder)
+    /// to prevent Jellyfin from displaying phantom entries.
     /// </summary>
     private void CleanupFileOnCancel(string filePath)
     {
         try
         {
-            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
-                var size = new FileInfo(filePath).Length;
-                File.Delete(filePath);
-                _logger.LogInformation("Cleaned up cancelled download file: {Path} ({Size} bytes)", filePath, size);
+                return;
             }
+
+            var size = new FileInfo(filePath).Length;
+            File.Delete(filePath);
+            _logger.LogInformation("Cleaned up cancelled download file: {Path} ({Size} bytes)", filePath, size);
+
+            // Clean up empty parent directories (season folder → series folder)
+            CleanupEmptyParentDirectories(filePath);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to cleanup cancelled file: {Path}", filePath);
         }
+    }
+
+    /// <summary>
+    /// Removes empty parent directories up to (but not including) the configured download base path.
+    /// Walks up from the file's directory: if Season folder is empty, delete it.
+    /// Then if series folder is empty, delete it too.
+    /// Stops at the configured download root to never delete the base path itself.
+    /// </summary>
+    private void CleanupEmptyParentDirectories(string filePath)
+    {
+        var basePath = Plugin.Instance?.Configuration.DownloadPath ?? string.Empty;
+        if (string.IsNullOrEmpty(basePath))
+        {
+            return;
+        }
+
+        try
+        {
+            var normalizedBase = Path.GetFullPath(basePath).TrimEnd(Path.DirectorySeparatorChar);
+            var dir = Path.GetDirectoryName(filePath);
+
+            // Walk up at most 2 levels (season folder → series folder)
+            for (int i = 0; i < 2 && !string.IsNullOrEmpty(dir); i++)
+            {
+                var normalizedDir = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar);
+
+                // Never delete the download base path itself
+                if (normalizedDir.Equals(normalizedBase, StringComparison.Ordinal) ||
+                    !normalizedDir.StartsWith(normalizedBase, StringComparison.Ordinal))
+                {
+                    break;
+                }
+
+                if (Directory.Exists(dir) && IsDirectoryEmpty(dir))
+                {
+                    Directory.Delete(dir);
+                    _logger.LogInformation("Removed empty directory: {Dir}", dir);
+                }
+                else
+                {
+                    // Directory not empty, stop walking up
+                    break;
+                }
+
+                dir = Path.GetDirectoryName(dir);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to cleanup empty parent directories for: {Path}", filePath);
+        }
+    }
+
+    /// <summary>
+    /// Checks if a directory is empty (no files or subdirectories).
+    /// </summary>
+    private static bool IsDirectoryEmpty(string path)
+    {
+        return !Directory.EnumerateFileSystemEntries(path).Any();
     }
 
     private async Task DownloadWithFfmpegAsync(DownloadTask task, CancellationToken cancellationToken)
