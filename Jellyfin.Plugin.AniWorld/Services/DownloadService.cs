@@ -132,7 +132,7 @@ public class DownloadService
     }
 
     /// <summary>
-    /// Cancels a download.
+    /// Cancels a download and cleans up any partial file on disk.
     /// </summary>
     public bool CancelDownload(string taskId)
     {
@@ -141,6 +141,10 @@ public class DownloadService
             task.CancellationSource?.Cancel();
             task.Status = DownloadStatus.Cancelled;
             _historyService.UpdateDownload(task);
+
+            // Clean up partial file regardless of size
+            CleanupFileOnCancel(task.OutputPath);
+
             return true;
         }
 
@@ -221,6 +225,7 @@ public class DownloadService
             {
                 task.Status = DownloadStatus.Cancelled;
                 _historyService.UpdateDownload(task);
+                CleanupFileOnCancel(task.OutputPath);
                 return;
             }
 
@@ -242,6 +247,7 @@ public class DownloadService
                 {
                     task.Status = DownloadStatus.Cancelled;
                     _historyService.UpdateDownload(task);
+                    CleanupFileOnCancel(task.OutputPath);
                     return;
                 }
 
@@ -263,6 +269,7 @@ public class DownloadService
                 if (task.Status == DownloadStatus.Cancelled)
                 {
                     _historyService.UpdateDownload(task);
+                    CleanupFileOnCancel(task.OutputPath);
                     return;
                 }
             }
@@ -270,6 +277,7 @@ public class DownloadService
             {
                 task.Status = DownloadStatus.Cancelled;
                 _historyService.UpdateDownload(task);
+                CleanupFileOnCancel(task.OutputPath);
                 return;
             }
             catch (Exception ex)
@@ -538,7 +546,7 @@ public class DownloadService
     }
 
     /// <summary>
-    /// Cleans up a partial/failed download file.
+    /// Cleans up a partial/failed download file (only removes very small stubs).
     /// </summary>
     private void CleanupPartialFile(string filePath)
     {
@@ -557,6 +565,27 @@ public class DownloadService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Failed to cleanup partial file: {Path}", filePath);
+        }
+    }
+
+    /// <summary>
+    /// Cleans up a file on cancellation — removes regardless of size since
+    /// a cancelled download is always incomplete/unwanted.
+    /// </summary>
+    private void CleanupFileOnCancel(string filePath)
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            {
+                var size = new FileInfo(filePath).Length;
+                File.Delete(filePath);
+                _logger.LogInformation("Cleaned up cancelled download file: {Path} ({Size} bytes)", filePath, size);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to cleanup cancelled file: {Path}", filePath);
         }
     }
 
