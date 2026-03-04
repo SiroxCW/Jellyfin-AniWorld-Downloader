@@ -261,11 +261,18 @@ public class AniWorldService
     {
         var html = await FetchPageAsync(BaseUrl, cancellationToken).ConfigureAwait(false);
 
-        // Extract only the "Neue Animes" section
-        var newSectionIdx = html.IndexOf("Neue Anime", StringComparison.OrdinalIgnoreCase);
+        // Extract only the "Neue Animes" section — search for the <h2> heading
+        // to avoid matching navigation text like "Generiere neue Animes & Episoden"
+        var newSectionIdx = html.IndexOf("<h2>Neue Animes</h2>", StringComparison.OrdinalIgnoreCase);
         if (newSectionIdx < 0)
         {
-            _logger.LogWarning("Could not find 'Neue Animes' section on homepage");
+            // Fallback: try without h2 tags
+            newSectionIdx = html.IndexOf("Neue Animes</h2>", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (newSectionIdx < 0)
+        {
+            _logger.LogWarning("Could not find 'Neue Animes' heading on homepage");
             return new List<BrowseItem>();
         }
 
@@ -287,17 +294,23 @@ public class AniWorldService
     }
 
     /// <summary>
-    /// Parses browse items (popular/new) from HTML containing coverListItem elements.
+    /// Parses browse items (popular/new) from HTML.
+    /// Handles two site layouts:
+    ///   - Popular page: col-md-15 grid items with direct img + h3 + small
+    ///   - Homepage "Neue Animes": coverListItem wrappers with nested seriesListHorizontalCover
+    /// Both share a common structure: anchor to /anime/stream/*, data-src for cover, h3 for title, small for genre.
     /// </summary>
     private List<BrowseItem> ParseBrowseItems(string html)
     {
         var items = new List<BrowseItem>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Pattern for coverListItem entries
+        // Generic pattern: match any <a> linking to /anime/stream/ that contains
+        // a data-src image, an <h3> title, and optionally a <small> genre tag.
+        // Works for both col-md-15 (popular) and coverListItem (new releases) layouts.
         var itemPattern = new Regex(
-            @"<div\s+class=""coverListItem"">\s*<a\s+href=""(?<url>/anime/stream/[^""]+)""[^>]*title=""(?<title>[^""]+)""[^>]*>.*?data-src=""(?<cover>[^""]+)"".*?<h3>\s*(?<name>[^<]+?)\s*</h3>\s*(?:<small>(?<genre>[^<]*)</small>)?",
-            RegexOptions.Singleline | RegexOptions.Compiled);
+            @"<a\s+href=""(?<url>/anime/stream/[^""]+)""[^>]*>.*?data-src=""(?<cover>[^""]+)"".*?<h3>(?<name>.+?)\s*(?:<span[^>]*>\s*</span>)?\s*</h3>\s*(?:<small>(?<genre>[^<]*)</small>)?",
+            RegexOptions.Singleline);
 
         foreach (Match match in itemPattern.Matches(html))
         {
@@ -314,9 +327,13 @@ public class AniWorldService
                 ? coverPath
                 : $"{BaseUrl}{coverPath}";
 
+            // Strip any remaining HTML tags from the title (e.g. nested spans)
+            var rawTitle = match.Groups["name"].Value.Trim();
+            var cleanTitle = Regex.Replace(rawTitle, "<[^>]+>", string.Empty).Trim();
+
             items.Add(new BrowseItem
             {
-                Title = DecodeHtml(match.Groups["name"].Value.Trim()),
+                Title = DecodeHtml(cleanTitle),
                 Url = url,
                 CoverImageUrl = coverUrl,
                 Genre = match.Groups["genre"].Success ? DecodeHtml(match.Groups["genre"].Value.Trim()) : string.Empty,
