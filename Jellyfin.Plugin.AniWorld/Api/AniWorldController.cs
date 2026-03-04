@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Net.Http;
 using System.Net.Mime;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.AniWorld.Helpers;
@@ -11,6 +13,7 @@ using MediaBrowser.Controller.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AniWorld.Api;
 
@@ -27,6 +30,8 @@ public class AniWorldController : ControllerBase
     private readonly DownloadService _downloadService;
     private readonly DownloadHistoryService _historyService;
     private readonly IServerConfigurationManager _configManager;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<AniWorldController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AniWorldController"/> class.
@@ -35,12 +40,16 @@ public class AniWorldController : ControllerBase
         AniWorldService aniWorldService,
         DownloadService downloadService,
         DownloadHistoryService historyService,
-        IServerConfigurationManager configManager)
+        IServerConfigurationManager configManager,
+        IHttpClientFactory httpClientFactory,
+        ILogger<AniWorldController> logger)
     {
         _aniWorldService = aniWorldService;
         _downloadService = downloadService;
         _historyService = historyService;
         _configManager = configManager;
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
     }
 
     // ── Search & Browse ─────────────────────────────────────────────
@@ -478,6 +487,83 @@ public class AniWorldController : ControllerBase
     {
         var stats = _historyService.GetStats();
         return Ok(stats);
+    }
+
+    /// <summary>
+    /// Check for plugin updates by comparing the current version with the latest Gitea release.
+    /// </summary>
+    [HttpGet("Version")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> CheckVersion(CancellationToken cancellationToken)
+    {
+        var config = Plugin.Instance?.Configuration;
+        var currentVersion = Plugin.Instance?.Version?.ToString() ?? "0.0.0.0";
+        var repoUrl = config?.RepositoryUrl ?? string.Empty;
+        var checkEnabled = config?.CheckForUpdates ?? true;
+
+        if (!checkEnabled || string.IsNullOrEmpty(repoUrl))
+        {
+            return Ok(new
+            {
+                currentVersion,
+                latestVersion = (string?)null,
+                updateAvailable = false,
+                checkEnabled = false,
+                repositoryUrl = repoUrl,
+            });
+        }
+
+        string? latestVersion = null;
+        string? releaseUrl = null;
+        bool updateAvailable = false;
+
+        try
+        {
+            // Extract the API base from the repo URL
+            // e.g. http://192.168.1.14:3000/SiroxCW/repo -> http://192.168.1.14:3000/api/v1/repos/SiroxCW/repo
+            var uri = new Uri(repoUrl.TrimEnd('/'));
+            var apiUrl = $"{uri.Scheme}://{uri.Authority}/api/v1/repos{uri.AbsolutePath}/releases?limit=1";
+
+            var client = _httpClientFactory.CreateClient("AniWorldUpdate");
+            client.Timeout = TimeSpan.FromSeconds(5);
+            var response = await client.GetAsync(apiUrl, cancellationToken).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(json);
+                var releases = doc.RootElement;
+
+                if (releases.GetArrayLength() > 0)
+                {
+                    var latest = releases[0];
+                    var tagName = latest.GetProperty("tag_name").GetString() ?? string.Empty;
+                    latestVersion = tagName.TrimStart('v', 'V');
+                    releaseUrl = latest.GetProperty("html_url").GetString();
+
+                    // Compare versions
+                    if (Version.TryParse(currentVersion, out var current) &&
+                        Version.TryParse(latestVersion, out var remote))
+                    {
+                        updateAvailable = remote > current;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Update check failed");
+        }
+
+        return Ok(new
+        {
+            currentVersion,
+            latestVersion,
+            updateAvailable,
+            checkEnabled = true,
+            repositoryUrl = repoUrl,
+            releaseUrl,
+        });
     }
 
     /// <summary>

@@ -1,14 +1,14 @@
 {
     "category": "General",
-    "changelog": "v1.1.0.0\n- Security: SSRF protection — all API endpoints reject non-aniworld.to URLs\n- Security: ffmpeg argument injection prevention via ArgumentList API\n- Security: XSS hardening with escJs() helper\n- Code cleanup: shared PathHelper, removed dead code\n- Feature: Browse tab with Popular and New Releases sections\n- Feature: Cover image grid with lazy loading and hover effects\n\nv1.0.0.0\n- Fix: HTML entities in episode titles fully decoded\n- Feature: Download All Seasons\n- Feature: Fallback provider + sidebar navigation link\n\nv0.3.0.0\n- Fix: Settings link added to main plugin page for easy access\n- Fix: Downloaded status now verifies file exists on disk (handles deleted files)\n- Fix: Cancelled downloads now properly clean up partial files from filesystem\n\nv0.2.0.0\n- Fix: Version now displays correctly in Jellyfin plugin list\n- Fix: Download All now uses preferred language from settings + language selector\n- Fix: Season switch race condition resolved\n- Fix: Special characters in filenames sanitized\n\nv0.1.0.0 - Initial release\n- Search for anime on aniworld.to\n- Browse seasons and episodes\n- Download episodes via VOE, Vidoza, or Vidmoly\n- Track download progress\n- Plugin configuration page",
+    "changelog": "v1.2.0.0\n- Feature: Repository link button (GitHub icon) in header\n- Feature: Update check — shows banner when new version available\n- Feature: Update check toggle + repo URL in settings\n- Fix: Clear completed button spacing to download items\n\nv1.1.0.0\n- Security: SSRF protection — all API endpoints reject non-aniworld.to URLs\n- Security: ffmpeg argument injection prevention via ArgumentList API\n- Security: XSS hardening with escJs() helper\n- Code cleanup: shared PathHelper, removed dead code\n- Feature: Browse tab with Popular and New Releases sections\n- Feature: Cover image grid with lazy loading and hover effects\n\nv1.0.0.0\n- Fix: HTML entities in episode titles fully decoded\n- Feature: Download All Seasons\n- Feature: Fallback provider + sidebar navigation link\n\nv0.3.0.0\n- Fix: Settings link added to main plugin page for easy access\n- Fix: Downloaded status now verifies file exists on disk (handles deleted files)\n- Fix: Cancelled downloads now properly clean up partial files from filesystem\n\nv0.2.0.0\n- Fix: Version now displays correctly in Jellyfin plugin list\n- Fix: Download All now uses preferred language from settings + language selector\n- Fix: Season switch race condition resolved\n- Fix: Special characters in filenames sanitized\n\nv0.1.0.0 - Initial release\n- Search for anime on aniworld.to\n- Browse seasons and episodes\n- Download episodes via VOE, Vidoza, or Vidmoly\n- Track download progress\n- Plugin configuration page",
     "description": "Search, browse, and download anime from aniworld.to directly within Jellyfin. Supports VOE, Filemoon, Vidoza, and Vidmoly providers with German Dub, English Sub, and German Sub options.",
     "guid": "e93d1d02-df60-4545-ae3c-7bb87dff024c",
     "name": "AniWorld Downloader",
     "overview": "Download anime from aniworld.to directly within Jellyfin",
     "owner": "SiroxCW",
     "targetAbi": "10.11.0.0",
-    "timestamp": "2026-03-04T09:20:00Z",
-    "version": "1.1.0.0",
+    "timestamp": "2026-03-04T11:45:00Z",
+    "version": "1.2.0.0",
     "status": "Active",
     "autoUpdate": false
 }

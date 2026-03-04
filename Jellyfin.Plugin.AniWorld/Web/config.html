@@ -92,6 +92,30 @@
                         </div>
                     </div>
 
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Updates</h3>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkCheckForUpdates" />
+                                <span>Check for updates</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Automatically check for new plugin versions when opening the downloader page.
+                                Queries the source repository for the latest release.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtRepositoryUrl">Repository URL</label>
+                            <input is="emby-input" type="text" id="txtRepositoryUrl"
+                                   placeholder="http://192.168.1.14:3000/SiroxCW/jellyfin-plugin-aniworld" />
+                            <div class="fieldDescription">
+                                URL of the plugin's source code repository. Used for the repo link and update checks.
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <button is="emby-button" type="submit" class="raised button-submit block">
                             <span>Save</span>

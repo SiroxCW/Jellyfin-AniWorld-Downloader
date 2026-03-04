@@ -865,6 +865,38 @@ export default function (view, params) {
         });
     }
 
+    // ── Version check & repo link ──
+    ApiClient.fetch({
+        url: ApiClient.getUrl('AniWorld/Version'),
+        type: 'GET',
+        dataType: 'json'
+    }).then(function (info) {
+        // Set repo link
+        if (info.repositoryUrl) {
+            var repoLink = view.querySelector('#aw-repo-link');
+            if (repoLink) {
+                repoLink.href = info.repositoryUrl;
+                repoLink.style.display = '';
+            }
+        }
+
+        // Show update banner if available
+        if (info.updateAvailable && info.latestVersion) {
+            var banner = view.querySelector('#aw-update-banner');
+            var text = view.querySelector('#aw-update-text');
+            var link = view.querySelector('#aw-update-link');
+            if (banner && text) {
+                text.textContent = 'v' + info.currentVersion + ' → v' + info.latestVersion;
+                if (link && info.releaseUrl) {
+                    link.href = info.releaseUrl;
+                } else if (link) {
+                    link.style.display = 'none';
+                }
+                banner.style.display = '';
+            }
+        }
+    }).catch(function () { /* update check failed silently */ });
+
     // Poll badge count periodically
     var badgePollInterval = setInterval(function () {
         ApiClient.fetch({

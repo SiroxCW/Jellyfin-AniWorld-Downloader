@@ -46,4 +46,16 @@ public class PluginConfiguration : BasePluginConfiguration
     /// when a download completes.
     /// </summary>
     public bool AutoScanLibrary { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether to check for plugin updates on page load.
+    /// Queries the Gitea releases API for newer versions.
+    /// </summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the repository URL for the source code and update checks.
+    /// Defaults to the Gitea repository.
+    /// </summary>
+    public string RepositoryUrl { get; set; } = "http://192.168.1.14:3000/SiroxCW/jellyfin-plugin-aniworld";
 }

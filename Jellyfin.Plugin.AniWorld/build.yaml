@@ -1,6 +1,6 @@
 name: "AniWorld Downloader"
 guid: "e93d1d02-df60-4545-ae3c-7bb87dff024c"
-version: "1.1.0.0"
+version: "1.2.0.0"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 owner: "SiroxCW"
