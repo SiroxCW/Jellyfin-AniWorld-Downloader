@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.AniWorld.Extractors;
+using Jellyfin.Plugin.AniWorld.Helpers;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
 
@@ -24,14 +25,6 @@ public class DownloadService
 {
     private const int DefaultMaxRetries = 3;
     private const int BaseRetryDelayMs = 3000;
-
-    private static readonly Regex SeasonEpisodeFromUrl = new(
-        @"/staffel-(?<season>\d+)/episode-(?<episode>\d+)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    private static readonly Regex MovieFromUrl = new(
-        @"/filme/film-(?<num>\d+)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly AniWorldService _aniWorldService;
     private readonly DownloadHistoryService _historyService;
@@ -102,8 +95,7 @@ public class DownloadService
     {
         var taskId = Guid.NewGuid().ToString("N")[..12];
 
-        // Parse season/episode from URL for history tracking
-        var (season, episode) = ParseSeasonEpisode(episodeUrl);
+        var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl);
 
         var task = new DownloadTask
         {
@@ -142,7 +134,6 @@ public class DownloadService
             task.Status = DownloadStatus.Cancelled;
             _historyService.UpdateDownload(task);
 
-            // Clean up partial file regardless of size
             CleanupFileOnCancel(task.OutputPath);
 
             return true;
@@ -211,8 +202,6 @@ public class DownloadService
 
     /// <summary>
     /// Wraps the download execution with retry logic, exponential backoff, and provider fallback.
-    /// After all retries fail with the primary provider, if a different fallback provider is
-    /// configured, retries the entire cycle with the fallback provider.
     /// </summary>
     private async Task ExecuteDownloadWithRetryAsync(DownloadTask task, CancellationToken externalToken)
     {
@@ -220,12 +209,10 @@ public class DownloadService
         var token = task.CancellationSource.Token;
 
         var originalProvider = task.Provider;
-        var lastError = string.Empty;
 
         // Try primary provider first, then fallback if configured
         if (!await TryDownloadWithRetriesAsync(task, token).ConfigureAwait(false))
         {
-            // Primary provider exhausted all retries — try fallback
             var config = Plugin.Instance?.Configuration;
             var fallbackProvider = config?.FallbackProvider ?? string.Empty;
 
@@ -234,12 +221,10 @@ public class DownloadService
                 !fallbackProvider.Equals(originalProvider, StringComparison.OrdinalIgnoreCase) &&
                 task.Status == DownloadStatus.Failed)
             {
-                lastError = task.Error ?? string.Empty;
                 _logger.LogInformation(
                     "Primary provider {Primary} failed for {Url}. Trying fallback provider {Fallback}",
                     originalProvider, task.EpisodeUrl, fallbackProvider);
 
-                // Reset task for fallback attempt
                 task.Provider = fallbackProvider;
                 task.Status = DownloadStatus.Queued;
                 task.RetryCount = 0;
@@ -247,20 +232,17 @@ public class DownloadService
                 task.Error = $"Falling back to {fallbackProvider}...";
                 _historyService.UpdateDownload(task);
 
-                // Clean up any partial file from primary attempt
                 CleanupFileOnCancel(task.OutputPath);
 
                 if (await TryDownloadWithRetriesAsync(task, token).ConfigureAwait(false))
                 {
-                    return; // Fallback succeeded
+                    return;
                 }
 
-                // Both providers failed
                 task.Error = $"Failed with {originalProvider} and fallback {fallbackProvider}: {task.Error}";
                 _historyService.UpdateDownload(task);
             }
 
-            // Final cleanup
             if (task.Status == DownloadStatus.Failed)
             {
                 CleanupPartialFile(task.OutputPath);
@@ -283,7 +265,7 @@ public class DownloadService
                 task.Status = DownloadStatus.Cancelled;
                 _historyService.UpdateDownload(task);
                 CleanupFileOnCancel(task.OutputPath);
-                return true; // "handled" — don't try fallback
+                return true;
             }
 
             if (attempt > 0)
@@ -305,7 +287,7 @@ public class DownloadService
                     task.Status = DownloadStatus.Cancelled;
                     _historyService.UpdateDownload(task);
                     CleanupFileOnCancel(task.OutputPath);
-                    return true; // handled
+                    return true;
                 }
 
                 task.Error = null;
@@ -327,7 +309,7 @@ public class DownloadService
                 {
                     _historyService.UpdateDownload(task);
                     CleanupFileOnCancel(task.OutputPath);
-                    return true; // handled
+                    return true;
                 }
             }
             catch (OperationCanceledException)
@@ -335,7 +317,7 @@ public class DownloadService
                 task.Status = DownloadStatus.Cancelled;
                 _historyService.UpdateDownload(task);
                 CleanupFileOnCancel(task.OutputPath);
-                return true; // handled
+                return true;
             }
             catch (Exception ex)
             {
@@ -350,7 +332,7 @@ public class DownloadService
                     _historyService.UpdateDownload(task);
                     _logger.LogError(ex, "Download failed for {Url} after {Attempts} attempts with {Provider}",
                         task.EpisodeUrl, maxRetries + 1, task.Provider);
-                    return false; // exhausted — caller may try fallback
+                    return false;
                 }
             }
         }
@@ -373,7 +355,7 @@ public class DownloadService
             task.EpisodeTitle = details.TitleEn ?? details.TitleDe ?? "Unknown";
 
             // 2. Rename output path to include episode title if available
-            var newPath = InsertEpisodeTitleInPath(task.OutputPath, task.EpisodeTitle);
+            var newPath = PathHelper.InsertEpisodeTitleInPath(task.OutputPath, task.EpisodeTitle);
             if (newPath != task.OutputPath)
             {
                 task.OutputPath = newPath;
@@ -415,6 +397,13 @@ public class DownloadService
             if (string.IsNullOrEmpty(streamUrl))
             {
                 throw new InvalidOperationException("Failed to extract stream URL from provider");
+            }
+
+            // Validate the extracted stream URL is a real HTTP(S) URL
+            if (!Uri.TryCreate(streamUrl, UriKind.Absolute, out var streamUri) ||
+                (streamUri.Scheme != Uri.UriSchemeHttp && streamUri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new InvalidOperationException("Extracted stream URL is not a valid HTTP(S) URL");
             }
 
             _logger.LogInformation("Stream URL: {StreamUrl}", streamUrl);
@@ -459,78 +448,6 @@ public class DownloadService
                 _downloadSemaphore.Release();
             }
         }
-    }
-
-    /// <summary>
-    /// Inserts the episode title into the filename.
-    /// Transforms "SeriesName - S01E01.mkv" into "SeriesName - S01E01 - Episode Title.mkv".
-    /// </summary>
-    private static string InsertEpisodeTitleInPath(string outputPath, string episodeTitle)
-    {
-        if (string.IsNullOrWhiteSpace(episodeTitle) || episodeTitle == "Unknown")
-        {
-            return outputPath;
-        }
-
-        var dir = Path.GetDirectoryName(outputPath) ?? string.Empty;
-        var fileName = Path.GetFileNameWithoutExtension(outputPath);
-        var ext = Path.GetExtension(outputPath);
-
-        // Match pattern like "SeriesName - S01E01" or "SeriesName - S00E01"
-        var match = Regex.Match(fileName, @"^(.+ - S\d{2}E\d{2})$");
-        if (match.Success)
-        {
-            var safeTitle = SanitizeFileName(episodeTitle);
-            // Truncate very long titles to keep filenames reasonable
-            if (safeTitle.Length > 80)
-            {
-                safeTitle = safeTitle[..77] + "...";
-            }
-
-            var newName = $"{match.Groups[1].Value} - {safeTitle}{ext}";
-            return Path.Combine(dir, newName);
-        }
-
-        return outputPath;
-    }
-
-    /// <summary>
-    /// Sanitizes a file/folder name by removing invalid and problematic characters.
-    /// Strips characters that cause issues on Windows, SMB shares, and some media players:
-    /// : ? ! * " &lt; &gt; | in addition to OS-level invalid chars.
-    /// Apostrophes are preserved as simple '.
-    /// </summary>
-    private static string SanitizeFileName(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        // Additional chars that are problematic on Windows/SMB/media players
-        var extraInvalid = new[] { ':', '?', '!', '*', '"', '<', '>', '|' };
-        var sanitized = new string(name
-            .Where(c => !invalid.Contains(c) && !extraInvalid.Contains(c))
-            .ToArray());
-        // Collapse multiple spaces that may result from removals
-        sanitized = Regex.Replace(sanitized, @"\s{2,}", " ");
-        return string.IsNullOrWhiteSpace(sanitized) ? "Unknown" : sanitized.Trim();
-    }
-
-    /// <summary>
-    /// Parses season and episode numbers from an aniworld.to URL.
-    /// </summary>
-    private static (int season, int episode) ParseSeasonEpisode(string url)
-    {
-        var seMatch = SeasonEpisodeFromUrl.Match(url);
-        if (seMatch.Success)
-        {
-            return (int.Parse(seMatch.Groups["season"].Value), int.Parse(seMatch.Groups["episode"].Value));
-        }
-
-        var movieMatch = MovieFromUrl.Match(url);
-        if (movieMatch.Success)
-        {
-            return (0, int.Parse(movieMatch.Groups["num"].Value));
-        }
-
-        return (0, 0);
     }
 
     /// <summary>
@@ -604,7 +521,6 @@ public class DownloadService
 
     /// <summary>
     /// Cleans up a partial/failed download file (only removes very small stubs).
-    /// Also cleans up empty parent directories if the file was removed.
     /// </summary>
     private void CleanupPartialFile(string filePath)
     {
@@ -630,8 +546,6 @@ public class DownloadService
     /// <summary>
     /// Cleans up a file on cancellation — removes regardless of size since
     /// a cancelled download is always incomplete/unwanted.
-    /// Also removes empty parent directories (season folder, series folder)
-    /// to prevent Jellyfin from displaying phantom entries.
     /// </summary>
     private void CleanupFileOnCancel(string filePath)
     {
@@ -646,7 +560,6 @@ public class DownloadService
             File.Delete(filePath);
             _logger.LogInformation("Cleaned up cancelled download file: {Path} ({Size} bytes)", filePath, size);
 
-            // Clean up empty parent directories (season folder → series folder)
             CleanupEmptyParentDirectories(filePath);
         }
         catch (Exception ex)
@@ -657,9 +570,6 @@ public class DownloadService
 
     /// <summary>
     /// Removes empty parent directories up to (but not including) the configured download base path.
-    /// Walks up from the file's directory: if Season folder is empty, delete it.
-    /// Then if series folder is empty, delete it too.
-    /// Stops at the configured download root to never delete the base path itself.
     /// </summary>
     private void CleanupEmptyParentDirectories(string filePath)
     {
@@ -674,12 +584,10 @@ public class DownloadService
             var normalizedBase = Path.GetFullPath(basePath).TrimEnd(Path.DirectorySeparatorChar);
             var dir = Path.GetDirectoryName(filePath);
 
-            // Walk up at most 2 levels (season folder → series folder)
             for (int i = 0; i < 2 && !string.IsNullOrEmpty(dir); i++)
             {
                 var normalizedDir = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar);
 
-                // Never delete the download base path itself
                 if (normalizedDir.Equals(normalizedBase, StringComparison.Ordinal) ||
                     !normalizedDir.StartsWith(normalizedBase, StringComparison.Ordinal))
                 {
@@ -693,7 +601,6 @@ public class DownloadService
                 }
                 else
                 {
-                    // Directory not empty, stop walking up
                     break;
                 }
 
@@ -706,14 +613,15 @@ public class DownloadService
         }
     }
 
-    /// <summary>
-    /// Checks if a directory is empty (no files or subdirectories).
-    /// </summary>
     private static bool IsDirectoryEmpty(string path)
     {
         return !Directory.EnumerateFileSystemEntries(path).Any();
     }
 
+    /// <summary>
+    /// Downloads a stream using ffmpeg. Uses ArgumentList to avoid shell injection
+    /// and argument quoting issues with URLs or file paths containing special characters.
+    /// </summary>
     private async Task DownloadWithFfmpegAsync(DownloadTask task, CancellationToken cancellationToken)
     {
         var ffmpegPath = FindFfmpeg();
@@ -722,24 +630,35 @@ public class DownloadService
             throw new InvalidOperationException("ffmpeg not found. Please ensure ffmpeg is installed.");
         }
 
-        var args = $"-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 " +
-                   $"-i \"{task.StreamUrl}\" -c copy -bsf:a aac_adtstoasc -y \"{task.OutputPath}\"";
-
-        _logger.LogDebug("Running: {Ffmpeg} {Args}", ffmpegPath, args);
-
-        using var process = new Process
+        // Use ProcessStartInfo.ArgumentList for safe argument passing (no shell quoting issues).
+        // This prevents argument injection via crafted stream URLs or file paths.
+        var startInfo = new ProcessStartInfo
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = ffmpegPath,
-                Arguments = args,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            },
+            FileName = ffmpegPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
         };
 
+        startInfo.ArgumentList.Add("-reconnect");
+        startInfo.ArgumentList.Add("1");
+        startInfo.ArgumentList.Add("-reconnect_streamed");
+        startInfo.ArgumentList.Add("1");
+        startInfo.ArgumentList.Add("-reconnect_delay_max");
+        startInfo.ArgumentList.Add("5");
+        startInfo.ArgumentList.Add("-i");
+        startInfo.ArgumentList.Add(task.StreamUrl!);
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add("copy");
+        startInfo.ArgumentList.Add("-bsf:a");
+        startInfo.ArgumentList.Add("aac_adtstoasc");
+        startInfo.ArgumentList.Add("-y");
+        startInfo.ArgumentList.Add(task.OutputPath);
+
+        _logger.LogDebug("Running ffmpeg for: {Url} -> {Path}", task.StreamUrl, task.OutputPath);
+
+        using var process = new Process { StartInfo = startInfo };
         process.Start();
 
         var progressPattern = new Regex(@"time=(?<time>\d+:\d+:\d+\.\d+)", RegexOptions.Compiled);
@@ -807,7 +726,6 @@ public class DownloadService
             "/usr/lib/jellyfin-ffmpeg/ffmpeg",
             "/usr/bin/ffmpeg",
             "/usr/local/bin/ffmpeg",
-            "ffmpeg",
         };
 
         foreach (var path in paths)

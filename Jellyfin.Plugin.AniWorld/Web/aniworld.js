@@ -7,6 +7,13 @@ export default function (view, params) {
         return d.innerHTML;
     }
 
+    // Escape a string for safe inclusion inside a JS single-quoted string in an HTML attribute.
+    // Prevents XSS via crafted provider names or titles breaking out of onclick="...fn('HERE')".
+    function escJs(str) {
+        if (!str) return '';
+        return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
     function formatSize(bytes) {
         if (!bytes || bytes === 0) return '0 B';
         if (bytes < 1024) return bytes + ' B';
@@ -101,7 +108,7 @@ export default function (view, params) {
 
             var html = '<div class="aw-grid">';
             results.forEach(function (item) {
-                html += '<div class="aw-card" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + esc(item.Title).replace(/'/g, "\\'") + '\')">';
+                html += '<div class="aw-card" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\')">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
                 if (item.Description) {
                     html += '<p>' + esc(item.Description.substring(0, 120)) + (item.Description.length > 120 ? '...' : '') + '</p>';
@@ -345,7 +352,7 @@ export default function (view, params) {
                     html += '<div class="aw-provider-btns">';
                     var providers = details.ProvidersByLanguage[langKey];
                     for (var prov in providers) {
-                        html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.downloadWithOptions(\'' + encodeURIComponent(url) + '\', \'' + langKey + '\', \'' + esc(prov) + '\')">' + esc(prov) + '</button>';
+                        html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.downloadWithOptions(\'' + encodeURIComponent(url) + '\', \'' + escJs(langKey) + '\', \'' + escJs(prov) + '\')">' + esc(prov) + '</button>';
                     }
                     html += '</div></div>';
                 }

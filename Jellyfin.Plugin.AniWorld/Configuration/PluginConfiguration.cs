@@ -32,11 +32,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public string FallbackProvider { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the naming template for downloaded files.
-    /// </summary>
-    public string NamingTemplate { get; set; } = "{title} ({year})/{title} S{season}E{episode}.mkv";
-
-    /// <summary>
     /// Gets or sets the maximum concurrent downloads.
     /// </summary>
     public int MaxConcurrentDownloads { get; set; } = 2;
@@ -51,9 +46,4 @@ public class PluginConfiguration : BasePluginConfiguration
     /// when a download completes.
     /// </summary>
     public bool AutoScanLibrary { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets whether to automatically organize downloaded files into the Jellyfin library.
-    /// </summary>
-    public bool AutoOrganize { get; set; } = true;
 }

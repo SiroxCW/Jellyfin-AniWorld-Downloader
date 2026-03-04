@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.IO;
 using System.Linq;
 using System.Net.Mime;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.AniWorld.Helpers;
 using Jellyfin.Plugin.AniWorld.Services;
 using MediaBrowser.Controller.Configuration;
 using Microsoft.AspNetCore.Authorization;
@@ -24,18 +23,6 @@ namespace Jellyfin.Plugin.AniWorld.Api;
 [Produces(MediaTypeNames.Application.Json)]
 public class AniWorldController : ControllerBase
 {
-    private static readonly Regex SeasonEpisodeFromUrl = new(
-        @"/staffel-(?<season>\d+)/episode-(?<episode>\d+)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    private static readonly Regex MovieFromUrl = new(
-        @"/filme/film-(?<num>\d+)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    private static readonly Regex SeriesSlugFromUrl = new(
-        @"/anime/stream/(?<slug>[^/]+)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
     private readonly AniWorldService _aniWorldService;
     private readonly DownloadService _downloadService;
     private readonly DownloadHistoryService _historyService;
@@ -76,10 +63,16 @@ public class AniWorldController : ControllerBase
     /// </summary>
     [HttpGet("Series")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<SeriesInfo>> GetSeries(
         [Required] string url,
         CancellationToken cancellationToken)
     {
+        if (!UrlValidator.IsValidAniWorldUrl(url))
+        {
+            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+        }
+
         var info = await _aniWorldService.GetSeriesInfoAsync(url, cancellationToken).ConfigureAwait(false);
         return Ok(info);
     }
@@ -89,10 +82,16 @@ public class AniWorldController : ControllerBase
     /// </summary>
     [HttpGet("Episodes")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<EpisodeRef>>> GetEpisodes(
         [Required] string url,
         CancellationToken cancellationToken)
     {
+        if (!UrlValidator.IsValidAniWorldUrl(url))
+        {
+            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+        }
+
         var episodes = await _aniWorldService.GetEpisodesAsync(url, cancellationToken).ConfigureAwait(false);
         return Ok(episodes);
     }
@@ -102,10 +101,16 @@ public class AniWorldController : ControllerBase
     /// </summary>
     [HttpGet("Episode")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<EpisodeDetails>> GetEpisodeDetails(
         [Required] string url,
         CancellationToken cancellationToken)
     {
+        if (!UrlValidator.IsValidAniWorldUrl(url))
+        {
+            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+        }
+
         var details = await _aniWorldService.GetEpisodeDetailsAsync(url, cancellationToken).ConfigureAwait(false);
         return Ok(details);
     }
@@ -128,6 +133,11 @@ public class AniWorldController : ControllerBase
             return BadRequest("Episode URL is required");
         }
 
+        if (!UrlValidator.IsValidAniWorldUrl(request.EpisodeUrl))
+        {
+            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+        }
+
         var config = Plugin.Instance?.Configuration;
         var basePath = config?.DownloadPath ?? string.Empty;
 
@@ -146,7 +156,7 @@ public class AniWorldController : ControllerBase
             return BadRequest("This episode has already been downloaded with this language. Set 'Force' to true to re-download.");
         }
 
-        var outputPath = BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl);
+        var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl);
 
         var taskId = await _downloadService.StartDownloadAsync(
             request.EpisodeUrl,
@@ -175,6 +185,11 @@ public class AniWorldController : ControllerBase
             return BadRequest("Season URL is required");
         }
 
+        if (!UrlValidator.IsValidAniWorldUrl(request.SeasonUrl))
+        {
+            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+        }
+
         var config = Plugin.Instance?.Configuration;
         var basePath = config?.DownloadPath ?? string.Empty;
 
@@ -198,7 +213,7 @@ public class AniWorldController : ControllerBase
 
         foreach (var ep in episodes)
         {
-            var outputPath = BuildOutputPath(basePath, seriesTitle, ep.Url);
+            var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
 
             // Skip if file already exists on disk
             if (System.IO.File.Exists(outputPath))
@@ -245,6 +260,11 @@ public class AniWorldController : ControllerBase
             return BadRequest("Series URL is required");
         }
 
+        if (!UrlValidator.IsValidAniWorldUrl(request.SeriesUrl))
+        {
+            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+        }
+
         var config = Plugin.Instance?.Configuration;
         var basePath = config?.DownloadPath ?? string.Empty;
 
@@ -274,7 +294,7 @@ public class AniWorldController : ControllerBase
 
             foreach (var ep in episodes)
             {
-                var outputPath = BuildOutputPath(basePath, seriesTitle, ep.Url);
+                var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
 
                 if (System.IO.File.Exists(outputPath) || _downloadService.IsAlreadyDownloaded(ep.Url, language))
                 {
@@ -306,7 +326,7 @@ public class AniWorldController : ControllerBase
 
             foreach (var ep in movies)
             {
-                var outputPath = BuildOutputPath(basePath, seriesTitle, ep.Url);
+                var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
 
                 if (System.IO.File.Exists(outputPath) || _downloadService.IsAlreadyDownloaded(ep.Url, language))
                 {
@@ -454,8 +474,14 @@ public class AniWorldController : ControllerBase
     /// </summary>
     [HttpGet("IsDownloaded")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<object> CheckIsDownloaded([Required] string url, string? language = null)
     {
+        if (!UrlValidator.IsValidAniWorldUrl(url))
+        {
+            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+        }
+
         var lang = language ?? Plugin.Instance?.Configuration.PreferredLanguage ?? "1";
         var downloaded = _downloadService.IsAlreadyDownloaded(url, lang);
         return Ok(new { downloaded, url, language = lang });
@@ -487,62 +513,6 @@ public class AniWorldController : ControllerBase
         var removed = _historyService.CleanupOld(days);
         return Ok(new { removed });
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Builds a Jellyfin-compatible output path from the episode URL.
-    /// Format: basePath/SeriesName/Season XX/SeriesName - SXXEXX.mkv
-    /// (Episode title is added later by DownloadService after resolving episode details.)
-    /// </summary>
-    private static string BuildOutputPath(string basePath, string seriesTitle, string episodeUrl)
-    {
-        var safeName = SanitizeFileName(seriesTitle);
-
-        var seMatch = SeasonEpisodeFromUrl.Match(episodeUrl);
-        if (seMatch.Success)
-        {
-            var season = int.Parse(seMatch.Groups["season"].Value);
-            var episode = int.Parse(seMatch.Groups["episode"].Value);
-            var seasonFolder = $"Season {season:D2}";
-            var fileName = $"{safeName} - S{season:D2}E{episode:D2}.mkv";
-
-            return Path.Combine(basePath, safeName, seasonFolder, fileName);
-        }
-
-        var movieMatch = MovieFromUrl.Match(episodeUrl);
-        if (movieMatch.Success)
-        {
-            var num = int.Parse(movieMatch.Groups["num"].Value);
-            var fileName = $"{safeName} - S00E{num:D2}.mkv";
-
-            return Path.Combine(basePath, safeName, "Specials", fileName);
-        }
-
-        // Fallback: use slug + timestamp
-        var slugMatch = SeriesSlugFromUrl.Match(episodeUrl);
-        var slug = slugMatch.Success ? slugMatch.Groups["slug"].Value : "unknown";
-        return Path.Combine(basePath, safeName, $"{slug}_{DateTime.UtcNow:yyyyMMddHHmmss}.mkv");
-    }
-
-    /// <summary>
-    /// Sanitizes a file/folder name by removing invalid and problematic characters.
-    /// Strips characters that cause issues on Windows, SMB shares, and some media players:
-    /// : ? ! * " &lt; &gt; | in addition to OS-level invalid chars.
-    /// Apostrophes are preserved as simple '.
-    /// </summary>
-    private static string SanitizeFileName(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        // Additional chars that are problematic on Windows/SMB/media players
-        var extraInvalid = new[] { ':', '?', '!', '*', '"', '<', '>', '|' };
-        var sanitized = new string(name
-            .Where(c => !invalid.Contains(c) && !extraInvalid.Contains(c))
-            .ToArray());
-        // Collapse multiple spaces that may result from removals
-        sanitized = Regex.Replace(sanitized, @"\s{2,}", " ");
-        return string.IsNullOrWhiteSpace(sanitized) ? "Unknown" : sanitized.Trim();
-    }
 }
 
 /// <summary>
@@ -564,9 +534,6 @@ public class DownloadRequest
 
     /// <summary>Gets or sets whether to force re-download even if already downloaded.</summary>
     public bool Force { get; set; }
-
-    /// <summary>Gets or sets the output path (deprecated, use config instead).</summary>
-    public string? OutputPath { get; set; }
 }
 
 /// <summary>

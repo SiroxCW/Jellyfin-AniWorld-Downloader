@@ -19,10 +19,6 @@ public class AniWorldService
     private const string SearchUrl = "https://aniworld.to/ajax/search";
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
-    private static readonly Regex EpisodeLinkPattern = new(
-        @"data-lang-key=""(?<langKey>\d+)""[^>]*data-link-target=""(?<redirect>[^""]+)""[^>]*>.*?<h4>(?<provider>[^<]+)</h4>",
-        RegexOptions.Singleline | RegexOptions.Compiled);
-
     private static readonly Regex SeasonLinkPattern = new(
         @"<a[^>]*href=""(/anime/stream/[^""]+/staffel-\d+)""[^>]*>",
         RegexOptions.Compiled);
