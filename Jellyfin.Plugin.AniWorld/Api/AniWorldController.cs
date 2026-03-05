@@ -27,6 +27,7 @@ namespace Jellyfin.Plugin.AniWorld.Api;
 public class AniWorldController : ControllerBase
 {
     private readonly AniWorldService _aniWorldService;
+    private readonly StoService _stoService;
     private readonly DownloadService _downloadService;
     private readonly DownloadHistoryService _historyService;
     private readonly IServerConfigurationManager _configManager;
@@ -37,31 +38,98 @@ public class AniWorldController : ControllerBase
     /// </summary>
     public AniWorldController(
         AniWorldService aniWorldService,
+        StoService stoService,
         DownloadService downloadService,
         DownloadHistoryService historyService,
         IServerConfigurationManager configManager,
         ILogger<AniWorldController> logger)
     {
         _aniWorldService = aniWorldService;
+        _stoService = stoService;
         _downloadService = downloadService;
         _historyService = historyService;
         _configManager = configManager;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Gets the correct streaming service for a source.
+    /// </summary>
+    private StreamingSiteService GetService(string? source)
+    {
+        return string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase)
+            ? _stoService
+            : _aniWorldService;
+    }
+
+    /// <summary>
+    /// Resolves the source from an explicit parameter or URL auto-detection.
+    /// </summary>
+    private static string ResolveSource(string? explicitSource, string? url = null)
+    {
+        if (!string.IsNullOrEmpty(explicitSource))
+        {
+            return explicitSource;
+        }
+
+        if (!string.IsNullOrEmpty(url))
+        {
+            return UrlValidator.DetectSource(url);
+        }
+
+        return "aniworld";
+    }
+
     // ── Search & Browse ─────────────────────────────────────────────
 
     /// <summary>
-    /// Search for anime on aniworld.to.
+    /// Search for series. Use source=all to query both sites, source=aniworld or source=sto for one site.
     /// </summary>
     [HttpGet("Search")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<SearchResult>>> Search(
         [Required] string query,
-        CancellationToken cancellationToken)
+        string? source = null,
+        CancellationToken cancellationToken = default)
     {
-        var results = await _aniWorldService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
-        return Ok(results);
+        var config = Plugin.Instance?.Configuration;
+
+        if (string.Equals(source, "all", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(source))
+        {
+            var results = new List<SearchResult>();
+
+            if (config?.AniWorldConfig.Enabled != false)
+            {
+                try
+                {
+                    var awResults = await _aniWorldService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+                    results.AddRange(awResults);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "AniWorld search failed for query: {Query}", query);
+                }
+            }
+
+            if (config?.StoConfig.Enabled == true)
+            {
+                try
+                {
+                    var stoResults = await _stoService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+                    results.AddRange(stoResults);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "s.to search failed for query: {Query}", query);
+                }
+            }
+
+            return Ok(results);
+        }
+
+        var service = GetService(source);
+        var singleResults = await service.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        return Ok(singleResults);
     }
 
     /// <summary>
@@ -72,14 +140,17 @@ public class AniWorldController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<SeriesInfo>> GetSeries(
         [Required] string url,
-        CancellationToken cancellationToken)
+        string? source = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!UrlValidator.IsValidAniWorldUrl(url))
+        if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
-        var info = await _aniWorldService.GetSeriesInfoAsync(url, cancellationToken).ConfigureAwait(false);
+        var resolvedSource = ResolveSource(source, url);
+        var service = GetService(resolvedSource);
+        var info = await service.GetSeriesInfoAsync(url, cancellationToken).ConfigureAwait(false);
         return Ok(info);
     }
 
@@ -91,14 +162,17 @@ public class AniWorldController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<EpisodeRef>>> GetEpisodes(
         [Required] string url,
-        CancellationToken cancellationToken)
+        string? source = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!UrlValidator.IsValidAniWorldUrl(url))
+        if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
-        var episodes = await _aniWorldService.GetEpisodesAsync(url, cancellationToken).ConfigureAwait(false);
+        var resolvedSource = ResolveSource(source, url);
+        var service = GetService(resolvedSource);
+        var episodes = await service.GetEpisodesAsync(url, cancellationToken).ConfigureAwait(false);
         return Ok(episodes);
     }
 
@@ -110,44 +184,54 @@ public class AniWorldController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<EpisodeDetails>> GetEpisodeDetails(
         [Required] string url,
-        CancellationToken cancellationToken)
+        string? source = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!UrlValidator.IsValidAniWorldUrl(url))
+        if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
-        var details = await _aniWorldService.GetEpisodeDetailsAsync(url, cancellationToken).ConfigureAwait(false);
+        var resolvedSource = ResolveSource(source, url);
+        var service = GetService(resolvedSource);
+        var details = await service.GetEpisodeDetailsAsync(url, cancellationToken).ConfigureAwait(false);
         return Ok(details);
     }
 
     /// <summary>
-    /// Get popular anime from aniworld.to.
+    /// Get popular series. Use source parameter to select site.
     /// </summary>
     [HttpGet("Popular")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<BrowseItem>>> GetPopular(CancellationToken cancellationToken)
+    public async Task<ActionResult<List<BrowseItem>>> GetPopular(
+        string? source = null,
+        CancellationToken cancellationToken = default)
     {
-        var items = await _aniWorldService.GetPopularAsync(cancellationToken).ConfigureAwait(false);
+        var resolvedSource = ResolveSource(source);
+        var service = GetService(resolvedSource);
+        var items = await service.GetPopularAsync(cancellationToken).ConfigureAwait(false);
         return Ok(items);
     }
 
     /// <summary>
-    /// Get newly added anime from aniworld.to.
+    /// Get newly added series. Use source parameter to select site.
     /// </summary>
     [HttpGet("New")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<BrowseItem>>> GetNewReleases(CancellationToken cancellationToken)
+    public async Task<ActionResult<List<BrowseItem>>> GetNewReleases(
+        string? source = null,
+        CancellationToken cancellationToken = default)
     {
-        var items = await _aniWorldService.GetNewReleasesAsync(cancellationToken).ConfigureAwait(false);
+        var resolvedSource = ResolveSource(source);
+        var service = GetService(resolvedSource);
+        var items = await service.GetNewReleasesAsync(cancellationToken).ConfigureAwait(false);
         return Ok(items);
     }
 
     // ── Downloads ───────────────────────────────────────────────────
 
     /// <summary>
-    /// Start downloading an episode. Automatically constructs the proper file path
-    /// following Jellyfin naming conventions: SeriesName/Season XX/SeriesName - SXXEXX - EpisodeTitle.mkv
+    /// Start downloading an episode.
     /// </summary>
     [HttpPost("Download")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -161,22 +245,23 @@ public class AniWorldController : ControllerBase
             return BadRequest("Episode URL is required");
         }
 
-        if (!UrlValidator.IsValidAniWorldUrl(request.EpisodeUrl))
+        if (!UrlValidator.IsValidUrl(request.EpisodeUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
+        var source = ResolveSource(request.Source, request.EpisodeUrl);
         var config = Plugin.Instance?.Configuration;
-        var basePath = config?.DownloadPath ?? string.Empty;
+        var basePath = config?.GetDownloadPath(source) ?? string.Empty;
 
         if (string.IsNullOrEmpty(basePath))
         {
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
         }
 
-        var language = request.LanguageKey ?? config?.PreferredLanguage ?? "1";
-        var provider = request.Provider ?? config?.PreferredProvider ?? "VOE";
-        var seriesTitle = request.SeriesTitle ?? "Unknown Anime";
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? "1";
+        var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
+        var seriesTitle = request.SeriesTitle ?? "Unknown";
 
         // Check if already downloaded (duplicate detection)
         if (!request.Force && _downloadService.IsAlreadyDownloaded(request.EpisodeUrl, language))
@@ -192,6 +277,7 @@ public class AniWorldController : ControllerBase
             provider,
             outputPath,
             seriesTitle,
+            source,
             cancellationToken).ConfigureAwait(false);
 
         if (taskId == null)
@@ -218,24 +304,26 @@ public class AniWorldController : ControllerBase
             return BadRequest("Season URL is required");
         }
 
-        if (!UrlValidator.IsValidAniWorldUrl(request.SeasonUrl))
+        if (!UrlValidator.IsValidUrl(request.SeasonUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
+        var source = ResolveSource(request.Source, request.SeasonUrl);
         var config = Plugin.Instance?.Configuration;
-        var basePath = config?.DownloadPath ?? string.Empty;
+        var basePath = config?.GetDownloadPath(source) ?? string.Empty;
 
         if (string.IsNullOrEmpty(basePath))
         {
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
         }
 
-        var language = request.LanguageKey ?? config?.PreferredLanguage ?? "1";
-        var provider = request.Provider ?? config?.PreferredProvider ?? "VOE";
-        var seriesTitle = request.SeriesTitle ?? "Unknown Anime";
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? "1";
+        var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
+        var seriesTitle = request.SeriesTitle ?? "Unknown";
 
-        var episodes = await _aniWorldService.GetEpisodesAsync(request.SeasonUrl, cancellationToken).ConfigureAwait(false);
+        var service = GetService(source);
+        var episodes = await service.GetEpisodesAsync(request.SeasonUrl, cancellationToken).ConfigureAwait(false);
 
         if (episodes.Count == 0)
         {
@@ -248,13 +336,11 @@ public class AniWorldController : ControllerBase
         {
             var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
 
-            // Skip if file already exists on disk
             if (System.IO.File.Exists(outputPath))
             {
                 continue;
             }
 
-            // Skip if already downloaded in history (unless forced)
             if (_downloadService.IsAlreadyDownloaded(ep.Url, language))
             {
                 continue;
@@ -266,6 +352,7 @@ public class AniWorldController : ControllerBase
                 provider,
                 outputPath,
                 seriesTitle,
+                source,
                 cancellationToken).ConfigureAwait(false);
 
             if (taskId == null) continue;
@@ -281,7 +368,7 @@ public class AniWorldController : ControllerBase
     }
 
     /// <summary>
-    /// Start downloading all episodes across all seasons of a series (full series batch download).
+    /// Start downloading all episodes across all seasons of a series.
     /// </summary>
     [HttpPost("DownloadAll")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -295,25 +382,26 @@ public class AniWorldController : ControllerBase
             return BadRequest("Series URL is required");
         }
 
-        if (!UrlValidator.IsValidAniWorldUrl(request.SeriesUrl))
+        if (!UrlValidator.IsValidUrl(request.SeriesUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
+        var source = ResolveSource(request.Source, request.SeriesUrl);
         var config = Plugin.Instance?.Configuration;
-        var basePath = config?.DownloadPath ?? string.Empty;
+        var basePath = config?.GetDownloadPath(source) ?? string.Empty;
 
         if (string.IsNullOrEmpty(basePath))
         {
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
         }
 
-        var language = request.LanguageKey ?? config?.PreferredLanguage ?? "1";
-        var provider = request.Provider ?? config?.PreferredProvider ?? "VOE";
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? "1";
+        var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
 
-        // Get series info to enumerate all seasons
-        var seriesInfo = await _aniWorldService.GetSeriesInfoAsync(request.SeriesUrl, cancellationToken).ConfigureAwait(false);
-        var seriesTitle = request.SeriesTitle ?? seriesInfo.Title ?? "Unknown Anime";
+        var service = GetService(source);
+        var seriesInfo = await service.GetSeriesInfoAsync(request.SeriesUrl, cancellationToken).ConfigureAwait(false);
+        var seriesTitle = request.SeriesTitle ?? seriesInfo.Title ?? "Unknown";
 
         if (seriesInfo.Seasons == null || seriesInfo.Seasons.Count == 0)
         {
@@ -325,7 +413,7 @@ public class AniWorldController : ControllerBase
 
         foreach (var season in seriesInfo.Seasons)
         {
-            var episodes = await _aniWorldService.GetEpisodesAsync(season.Url, cancellationToken).ConfigureAwait(false);
+            var episodes = await service.GetEpisodesAsync(season.Url, cancellationToken).ConfigureAwait(false);
 
             foreach (var ep in episodes)
             {
@@ -343,6 +431,7 @@ public class AniWorldController : ControllerBase
                     provider,
                     outputPath,
                     seriesTitle,
+                    source,
                     cancellationToken).ConfigureAwait(false);
 
                 if (taskId == null) { skippedCount++; continue; }
@@ -359,7 +448,7 @@ public class AniWorldController : ControllerBase
         if (seriesInfo.HasMovies)
         {
             var movieUrl = request.SeriesUrl.TrimEnd('/') + "/filme";
-            var movies = await _aniWorldService.GetEpisodesAsync(movieUrl, cancellationToken).ConfigureAwait(false);
+            var movies = await service.GetEpisodesAsync(movieUrl, cancellationToken).ConfigureAwait(false);
 
             foreach (var ep in movies)
             {
@@ -377,6 +466,7 @@ public class AniWorldController : ControllerBase
                     provider,
                     outputPath,
                     seriesTitle,
+                    source,
                     cancellationToken).ConfigureAwait(false);
 
                 if (taskId == null) { skippedCount++; continue; }
@@ -472,7 +562,6 @@ public class AniWorldController : ControllerBase
 
     /// <summary>
     /// Get persistent download history from the database.
-    /// Survives Jellyfin restarts unlike the active downloads list.
     /// </summary>
     [HttpGet("History")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -487,7 +576,7 @@ public class AniWorldController : ControllerBase
     }
 
     /// <summary>
-    /// Get download statistics (total downloads, bytes, series count, etc).
+    /// Get download statistics.
     /// </summary>
     [HttpGet("Stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -516,9 +605,9 @@ public class AniWorldController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<object> CheckIsDownloaded([Required] string url, string? language = null)
     {
-        if (!UrlValidator.IsValidAniWorldUrl(url))
+        if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
         var completedLanguage = _historyService.GetCompletedLanguage(url);
@@ -527,18 +616,54 @@ public class AniWorldController : ControllerBase
 
     /// <summary>
     /// Serves a language flag SVG by language key.
+    /// Accepts an optional source parameter to differentiate flag for language key "2":
+    /// aniworld: japanese-english.svg, sto: english.svg.
     /// </summary>
     [HttpGet("Flag/{lang}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [AllowAnonymous]
-    public ActionResult GetFlag(string lang)
+    public ActionResult GetFlag(string lang, string? source = null)
     {
+        var isSto = string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase);
+
         var resourceName = lang switch
         {
             "1" => "Jellyfin.Plugin.AniWorld.Web.german.svg",
-            "2" => "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
+            "2" => isSto
+                ? "Jellyfin.Plugin.AniWorld.Web.english.svg"
+                : "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
             "3" => "Jellyfin.Plugin.AniWorld.Web.japanese-german.svg",
+            _ => null
+        };
+
+        if (resourceName == null)
+        {
+            return NotFound();
+        }
+
+        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
+        if (stream == null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "image/svg+xml");
+    }
+
+    /// <summary>
+    /// Serves the site logo SVG for a source.
+    /// </summary>
+    [HttpGet("SiteLogo/{source}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AllowAnonymous]
+    public ActionResult GetSiteLogo(string source)
+    {
+        var resourceName = source.ToLowerInvariant() switch
+        {
+            "aniworld" => "Jellyfin.Plugin.AniWorld.Web.aniworld.svg",
+            "sto" => "Jellyfin.Plugin.AniWorld.Web.sto.svg",
             _ => null
         };
 
@@ -603,6 +728,9 @@ public class DownloadRequest
 
     /// <summary>Gets or sets whether to force re-download even if already downloaded.</summary>
     public bool Force { get; set; }
+
+    /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
+    public string? Source { get; set; }
 }
 
 /// <summary>
@@ -621,6 +749,9 @@ public class BatchDownloadRequest
 
     /// <summary>Gets or sets the series title for file naming.</summary>
     public string? SeriesTitle { get; set; }
+
+    /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
+    public string? Source { get; set; }
 }
 
 /// <summary>
@@ -639,4 +770,7 @@ public class FullSeriesDownloadRequest
 
     /// <summary>Gets or sets the series title for file naming.</summary>
     public string? SeriesTitle { get; set; }
+
+    /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
+    public string? Source { get; set; }
 }

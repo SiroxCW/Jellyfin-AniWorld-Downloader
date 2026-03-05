@@ -43,9 +43,36 @@ export default function (view, params) {
         }
     }
 
+    // Language names per source
+    function getLangNames(source) {
+        if (source === 'sto') {
+            return { '1': '\uD83C\uDDE9\uD83C\uDDEA German Dub', '2': '\uD83C\uDDEC\uD83C\uDDE7 English Dub' };
+        }
+        return { '1': '\uD83C\uDDE9\uD83C\uDDEA German Dub', '2': '\uD83C\uDDEC\uD83C\uDDE7 English Sub', '3': '\uD83C\uDDE9\uD83C\uDDEA German Sub' };
+    }
+
+    // Build language options HTML for season bar
+    function getLangOptionsHtml(source) {
+        var html = '<option value="">\uD83C\uDF10 Use Settings Default</option>';
+        html += '<option value="1">\uD83C\uDDE9\uD83C\uDDEA German Dub</option>';
+        if (source === 'sto') {
+            html += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Dub</option>';
+        } else {
+            html += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Sub</option>';
+            html += '<option value="3">\uD83C\uDDE9\uD83C\uDDEA German Sub</option>';
+        }
+        return html;
+    }
+
+    // Get site logo URL
+    function siteLogoUrl(source) {
+        return ApiClient.getUrl('AniWorld/SiteLogo/' + (source || 'aniworld'));
+    }
+
     var AW = {
         currentSeriesTitle: null,
         currentSeriesUrl: null,
+        currentSeriesSource: null,
         currentSeasonUrl: null,
         lastSearchQuery: null,
         lastSearchResults: null,
@@ -81,7 +108,7 @@ export default function (view, params) {
             }
 
             if (tab === 'search' && this.currentSeriesUrl) {
-                this.showSeries(encodeURIComponent(this.currentSeriesUrl), this.currentSeriesTitle);
+                this.showSeries(encodeURIComponent(this.currentSeriesUrl), this.currentSeriesTitle, this.currentSeriesSource);
             }
 
             if (tab === 'browse' && !this.browseLoaded.popular) {
@@ -101,37 +128,73 @@ export default function (view, params) {
             if (!container) return;
 
             if (this.browseLoaded[section]) {
-                // Re-render from cache
-                this.renderBrowseItems(this['browseCache_' + section] || [], container);
+                this._renderBrowseCombined(section, container);
                 return;
             }
 
             container.innerHTML = '<div class="aw-loading"><span class="aw-spinner"></span> Loading...</div>';
 
             var endpoint = section === 'new' ? 'AniWorld/New' : 'AniWorld/Popular';
-            ApiClient.fetch({
-                url: ApiClient.getUrl(endpoint),
-                type: 'GET',
-                dataType: 'json'
-            }).then(function (items) {
+            var promises = [];
+
+            // Load from aniworld
+            promises.push(ApiClient.fetch({
+                url: ApiClient.getUrl(endpoint, { source: 'aniworld' }),
+                type: 'GET', dataType: 'json'
+            }).catch(function () { return []; }));
+
+            // Load from s.to if enabled
+            promises.push(ApiClient.getPluginConfiguration('e93d1d02-df60-4545-ae3c-7bb87dff024c').then(function (config) {
+                if (config.StoConfig && config.StoConfig.Enabled) {
+                    return ApiClient.fetch({
+                        url: ApiClient.getUrl(endpoint, { source: 'sto' }),
+                        type: 'GET', dataType: 'json'
+                    }).catch(function () { return []; });
+                }
+                return [];
+            }).catch(function () { return []; }));
+
+            Promise.all(promises).then(function (results) {
                 AW.browseLoaded[section] = true;
-                AW['browseCache_' + section] = items;
-                AW.renderBrowseItems(items, container);
+                AW['browseCache_aniworld_' + section] = results[0] || [];
+                AW['browseCache_sto_' + section] = results[1] || [];
+                AW._renderBrowseCombined(section, container);
             }).catch(function (err) {
                 container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">❌</div>Failed to load: ' + esc(err.message || 'Unknown error') + '</div>';
             });
         },
 
-        renderBrowseItems: function (items, container) {
-            if (!items || items.length === 0) {
-                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No anime found.</div>';
+        _renderBrowseCombined: function (section, container) {
+            var awItems = this['browseCache_aniworld_' + section] || [];
+            var stoItems = this['browseCache_sto_' + section] || [];
+            var html = '';
+
+            if (awItems.length === 0 && stoItems.length === 0) {
+                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No content found.</div>';
                 return;
             }
 
+            if (awItems.length > 0) {
+                html += '<div class="aw-browse-section-title">AniWorld</div>';
+                html += this._buildBrowseGrid(awItems, 'aniworld');
+            }
+
+            if (stoItems.length > 0) {
+                html += '<div class="aw-browse-section-title">s.to</div>';
+                html += this._buildBrowseGrid(stoItems, 'sto');
+            }
+
+            container.innerHTML = html;
+        },
+
+        _buildBrowseGrid: function (items, source) {
             var html = '<div class="aw-browse-grid">';
             items.forEach(function (item) {
-                html += '<div class="aw-browse-card" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\')">';
+                var itemSource = item.Source || source || 'aniworld';
+                var badgeCls = 'aw-browse-source-badge' + (itemSource === 'aniworld' ? ' aw-badge-aniworld' : '');
+                html += '<div class="aw-browse-card" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\', \'' + escJs(itemSource) + '\')">';
                 html += '<img class="aw-browse-cover" src="' + esc(item.CoverImageUrl) + '" alt="' + esc(item.Title) + '" loading="lazy" onerror="this.style.display=\'none\'" />';
+                html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(itemSource) + '" onerror="this.style.display=\'none\'" />';
                 html += '<div class="aw-browse-info">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
                 if (item.Genre) {
@@ -140,7 +203,16 @@ export default function (view, params) {
                 html += '</div></div>';
             });
             html += '</div>';
-            container.innerHTML = html;
+            return html;
+        },
+
+        renderBrowseItems: function (items, container) {
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No content found.</div>';
+                return;
+            }
+
+            container.innerHTML = this._buildBrowseGrid(items, 'aniworld');
         },
 
         // ── Search ──
@@ -164,37 +236,70 @@ export default function (view, params) {
             });
         },
 
+        searchGeneration: 0,
+
         renderSearchResults: function (results) {
             var content = view.querySelector('#aw-content');
             if (!results || results.length === 0) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDD0D</div>No anime found. Try different keywords.</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDD0D</div>No results found. Try different keywords.</div>';
                 return;
             }
 
-            var html = '<div class="aw-grid">';
-            results.forEach(function (item) {
-                html += '<div class="aw-card" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\')">';
+            this.searchGeneration++;
+            var myGen = this.searchGeneration;
+
+            var html = '<div class="aw-browse-grid">';
+            results.forEach(function (item, idx) {
+                var source = item.Source || 'aniworld';
+                var badgeCls = 'aw-browse-source-badge' + (source === 'aniworld' ? ' aw-badge-aniworld' : '');
+                var cardId = 'aw-sr-' + idx;
+                html += '<div class="aw-browse-card" id="' + cardId + '" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\', \'' + escJs(source) + '\')">';
+                html += '<div class="aw-browse-cover aw-cover-placeholder" id="' + cardId + '-cover"></div>';
+                html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" />';
+                html += '<div class="aw-browse-info">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
-                if (item.Description) {
-                    html += '<p>' + esc(item.Description.substring(0, 120)) + (item.Description.length > 120 ? '...' : '') + '</p>';
-                }
-                html += '</div>';
+                html += '</div></div>';
             });
             html += '</div>';
             content.innerHTML = html;
+
+            // Lazy-load all covers in parallel (no stagger)
+            results.forEach(function (item, idx) {
+                AW.fetchSearchCover(item.Url, item.Source || 'aniworld', 'aw-sr-' + idx, myGen);
+            });
+        },
+
+        fetchSearchCover: function (seriesUrl, source, cardId, generation) {
+            ApiClient.fetch({
+                url: ApiClient.getUrl('AniWorld/Series', { url: seriesUrl, source: source }),
+                type: 'GET',
+                dataType: 'json'
+            }).then(function (series) {
+                if (generation !== undefined && AW.searchGeneration !== generation) return;
+                var coverEl = view.querySelector('#' + cardId + '-cover');
+                if (!coverEl) return;
+                if (series.CoverImageUrl) {
+                    var img = document.createElement('img');
+                    img.className = 'aw-browse-cover';
+                    img.src = series.CoverImageUrl;
+                    img.alt = series.Title || '';
+                    img.loading = 'lazy';
+                    img.onerror = function () { this.style.display = 'none'; };
+                    coverEl.parentNode.replaceChild(img, coverEl);
+                }
+            }).catch(function () { /* keep placeholder */ });
         },
 
         // ── Series Detail ──
-        showSeries: function (encodedUrl, title) {
+        showSeries: function (encodedUrl, title, source) {
             var url = decodeURIComponent(encodedUrl);
             this.currentSeriesUrl = url;
+            this.currentSeriesSource = source || 'aniworld';
 
             // If called from browse tab, switch to search tab to show the detail view
-            // and remember where to go back to
             var browseTab = view.querySelector('#browseTab');
             if (browseTab && browseTab.style.display !== 'none') {
                 this.browseReturnTo = true;
-                // Show search tab for detail view
                 view.querySelectorAll('.aw-tab').forEach(function (t) { t.classList.remove('active'); });
                 view.querySelector('[data-tab="search"]').classList.add('active');
                 view.querySelector('#searchTab').style.display = '';
@@ -205,7 +310,7 @@ export default function (view, params) {
             content.innerHTML = '<div class="aw-loading"><span class="aw-spinner"></span> Loading series info...</div>';
 
             ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/Series', { url: url }),
+                url: ApiClient.getUrl('AniWorld/Series', { url: url, source: this.currentSeriesSource }),
                 type: 'GET',
                 dataType: 'json'
             }).then(function (series) {
@@ -218,14 +323,19 @@ export default function (view, params) {
 
         renderSeries: function (series, seriesUrl) {
             var content = view.querySelector('#aw-content');
+            var source = this.currentSeriesSource || 'aniworld';
             var html = '<button class="aw-btn aw-btn-secondary aw-back" onclick="window.AW.goBack()">\u2190 Back to Results</button>';
+
+            if (source === 'sto' && series.Genres && series.Genres.some(function (g) { return g.toLowerCase() === 'anime'; })) {
+                html += '<div class="aw-warning">\u26A0\uFE0F For anime, using AniWorld as source is recommended.</div>';
+            }
 
             html += '<div class="aw-series">';
             if (series.CoverImageUrl) {
                 html += '<img class="aw-cover" src="' + esc(series.CoverImageUrl) + '" alt="Cover" onerror="this.style.display=\'none\'" />';
             }
             html += '<div class="aw-meta">';
-            html += '<h2>' + esc(series.Title) + '</h2>';
+            html += '<h2><img class="aw-source-logo" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" style="height:1.3em"> ' + esc(series.Title) + '</h2>';
 
             if (series.Genres && series.Genres.length > 0) {
                 html += '<div class="aw-genres">';
@@ -276,7 +386,6 @@ export default function (view, params) {
                 btn.classList.add('active');
             }
 
-            // Increment generation to cancel any in-flight episode title loads
             this.seasonGeneration++;
             var myGeneration = this.seasonGeneration;
 
@@ -289,12 +398,12 @@ export default function (view, params) {
             epContainer.innerHTML = '<div class="aw-loading"><span class="aw-spinner"></span> Loading episodes...</div>';
             if (barContainer) barContainer.innerHTML = '';
 
+            var source = this.currentSeriesSource || 'aniworld';
             ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/Episodes', { url: url }),
+                url: ApiClient.getUrl('AniWorld/Episodes', { url: url, source: source }),
                 type: 'GET',
                 dataType: 'json'
             }).then(function (episodes) {
-                // Only render if this is still the current season
                 if (AW.seasonGeneration !== myGeneration) return;
                 AW.renderEpisodes(episodes, url, myGeneration);
             }).catch(function (err) {
@@ -306,6 +415,7 @@ export default function (view, params) {
         renderEpisodes: function (episodes, seasonUrl, generation) {
             var epContainer = view.querySelector('#aw-episodes');
             var barContainer = view.querySelector('#aw-season-bar');
+            var source = this.currentSeriesSource || 'aniworld';
 
             if (!episodes || episodes.length === 0) {
                 epContainer.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDCED</div>No episodes found.</div>';
@@ -317,10 +427,7 @@ export default function (view, params) {
                 var bar = '<div class="aw-season-actions">';
                 bar += '<span class="aw-ep-count">' + episodes.length + ' episode' + (episodes.length === 1 ? '' : 's') + '</span>';
                 bar += '<select id="aw-season-lang" class="aw-lang-select" title="Language for downloads">';
-                bar += '<option value="">\uD83C\uDF10 Use Settings Default</option>';
-                bar += '<option value="1">\uD83C\uDDE9\uD83C\uDDEA German Dub</option>';
-                bar += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Sub</option>';
-                bar += '<option value="3">\uD83C\uDDE9\uD83C\uDDEA German Sub</option>';
+                bar += getLangOptionsHtml(source);
                 bar += '</select>';
                 bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')">\u2B07\uFE0F Download Season</button>';
                 if (AW.currentSeriesUrl) {
@@ -348,12 +455,10 @@ export default function (view, params) {
             html += '</div>';
             epContainer.innerHTML = html;
 
-            // Load titles and check download status (with race condition guard)
             var myGen = generation || AW.seasonGeneration;
             episodes.forEach(function (ep, idx) {
                 var epId = 'ep-' + ep.Number + '-' + (ep.IsMovie ? 'movie' : 'ep');
                 setTimeout(function () {
-                    // Abort if user has switched seasons
                     if (AW.seasonGeneration !== myGen) return;
                     AW.fetchEpisodeTitle(ep.Url, epId, myGen);
                     AW.checkIsDownloaded(ep.Url, epId);
@@ -365,12 +470,12 @@ export default function (view, params) {
             var titleEl = view.querySelector('#' + epId + '-title');
             if (!titleEl) return;
 
+            var source = this.currentSeriesSource || 'aniworld';
             ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/Episode', { url: url }),
+                url: ApiClient.getUrl('AniWorld/Episode', { url: url, source: source }),
                 type: 'GET',
                 dataType: 'json'
             }).then(function (details) {
-                // Abort if user has switched seasons since this request started
                 if (generation !== undefined && AW.seasonGeneration !== generation) return;
                 titleEl = view.querySelector('#' + epId + '-title');
                 if (!titleEl) return;
@@ -388,6 +493,7 @@ export default function (view, params) {
         },
 
         checkIsDownloaded: function (url, epId) {
+            var source = this.currentSeriesSource || 'aniworld';
             ApiClient.fetch({
                 url: ApiClient.getUrl('AniWorld/IsDownloaded', { url: url }),
                 type: 'GET',
@@ -396,7 +502,7 @@ export default function (view, params) {
                 if (result && result.downloaded && result.language) {
                     var badge = view.querySelector('#' + epId + '-dl');
                     if (badge) {
-                        badge.innerHTML = '\u2713 <img src="' + ApiClient.getUrl('AniWorld/Flag/' + result.language) + '">';
+                        badge.innerHTML = '\u2713 <img src="' + ApiClient.getUrl('AniWorld/Flag/' + result.language, { source: source }) + '">';
                         badge.style.display = '';
                     }
                 }
@@ -417,12 +523,13 @@ export default function (view, params) {
             panel.innerHTML = '<div class="aw-loading"><span class="aw-spinner"></span> Loading...</div>';
 
             var url = decodeURIComponent(encodedUrl);
+            var source = this.currentSeriesSource || 'aniworld';
             ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/Episode', { url: url }),
+                url: ApiClient.getUrl('AniWorld/Episode', { url: url, source: source }),
                 type: 'GET',
                 dataType: 'json'
             }).then(function (details) {
-                var langNames = { '1': '\uD83C\uDDE9\uD83C\uDDEA German Dub', '2': '\uD83C\uDDEC\uD83C\uDDE7 English Sub', '3': '\uD83C\uDDE9\uD83C\uDDEA German Sub' };
+                var langNames = getLangNames(source);
                 var html = '';
 
                 var hasAny = false;
@@ -463,10 +570,10 @@ export default function (view, params) {
             var seasonUrl = decodeURIComponent(encodedSeasonUrl);
             var body = {
                 SeasonUrl: seasonUrl,
-                SeriesTitle: this.currentSeriesTitle
+                SeriesTitle: this.currentSeriesTitle,
+                Source: this.currentSeriesSource || 'aniworld'
             };
 
-            // Include language selection if user picked one
             var langSelect = view.querySelector('#aw-season-lang');
             if (langSelect && langSelect.value) {
                 body.LanguageKey = langSelect.value;
@@ -495,10 +602,10 @@ export default function (view, params) {
             var seriesUrl = decodeURIComponent(encodedSeriesUrl);
             var body = {
                 SeriesUrl: seriesUrl,
-                SeriesTitle: this.currentSeriesTitle
+                SeriesTitle: this.currentSeriesTitle,
+                Source: this.currentSeriesSource || 'aniworld'
             };
 
-            // Use language selector if present
             var langSelect = view.querySelector('#aw-season-lang');
             if (langSelect && langSelect.value) {
                 body.LanguageKey = langSelect.value;
@@ -529,7 +636,8 @@ export default function (view, params) {
         _startDownload: function (episodeUrl, langKey, provider) {
             var body = {
                 EpisodeUrl: episodeUrl,
-                SeriesTitle: this.currentSeriesTitle
+                SeriesTitle: this.currentSeriesTitle,
+                Source: this.currentSeriesSource || 'aniworld'
             };
             if (langKey) body.LanguageKey = langKey;
             if (provider) body.Provider = provider;
@@ -549,7 +657,6 @@ export default function (view, params) {
         },
 
         _handleApiError: function (err, prefix) {
-            // Jellyfin ApiClient rejects with a Response object, not an Error
             if (err && typeof err.json === 'function') {
                 err.json().then(function (body) {
                     var msg = body.detail || body.title || body.error || JSON.stringify(body);
@@ -596,19 +703,16 @@ export default function (view, params) {
                 return;
             }
 
-            // Sort: active statuses first by priority, then by season/episode
-            // Terminal statuses (Completed/Failed/Cancelled) share same priority, sorted newest first
             var statusOrder = { Downloading: 0, Extracting: 1, Resolving: 1, Retrying: 2, Queued: 3, Completed: 4, Failed: 4, Cancelled: 4 };
             downloads.sort(function (a, b) {
                 var sa = statusOrder[a.Status] !== undefined ? statusOrder[a.Status] : 9;
                 var sb = statusOrder[b.Status] !== undefined ? statusOrder[b.Status] : 9;
                 if (sa !== sb) return sa - sb;
-                // Terminal statuses: newest (most recently started) first
                 if (sa === 4) {
                     return (b.StartedAt || '').localeCompare(a.StartedAt || '');
                 }
-                if ((a.Season || 0) !== (b.Season || 0)) return (a.Season || 0) - (b.Season || 0);
-                return (a.Episode || 0) - (b.Episode || 0);
+                // For active/queued items, preserve backend insertion order
+                return 0;
             });
 
             var hasCompleted = downloads.some(function (dl) {
@@ -626,10 +730,11 @@ export default function (view, params) {
                 var isFailed = dl.Status === 'Failed';
                 var isActive = ['Queued', 'Resolving', 'Extracting', 'Downloading', 'Retrying'].indexOf(dl.Status) !== -1;
                 var fileName = dl.OutputPath ? dl.OutputPath.split('/').pop().split('\\').pop() : dl.Id;
+                var dlSource = dl.Source || 'aniworld';
 
                 html += '<div class="aw-dl-item">';
                 html += '<div class="aw-dl-info">';
-                html += '<strong>' + esc(dl.EpisodeTitle || fileName) + '</strong>';
+                html += '<strong><img class="aw-source-logo" src="' + siteLogoUrl(dlSource) + '" onerror="this.style.display=\'none\'" style="height:1em"> ' + esc(dl.EpisodeTitle || fileName) + '</strong>';
                 html += '<small>' + esc(dl.Provider) + ' \u00B7 ' + esc(dl.Status);
                 if (dl.RetryCount > 0) {
                     html += ' (retry ' + dl.RetryCount + '/' + dl.MaxRetries + ')';
@@ -776,7 +881,6 @@ export default function (view, params) {
             var container = view.querySelector('#aw-history-filters-container');
             if (!container) return;
 
-            // Only render once
             if (container.dataset.rendered === 'true') return;
             container.dataset.rendered = 'true';
 
@@ -810,17 +914,18 @@ export default function (view, params) {
                 return;
             }
 
-            var langNames = { '1': '\uD83C\uDDE9\uD83C\uDDEA DE Dub', '2': '\uD83C\uDDEC\uD83C\uDDE7 EN Sub', '3': '\uD83C\uDDE9\uD83C\uDDEA DE Sub' };
             var html = reset ? '<div class="aw-history">' : '';
 
             records.forEach(function (rec) {
                 var statusCls = 'aw-status-' + rec.Status.toLowerCase();
                 var title = rec.EpisodeTitle || '';
                 var seLabel = 'S' + String(rec.Season).padStart(2, '0') + 'E' + String(rec.Episode).padStart(2, '0');
+                var recSource = rec.Source || 'aniworld';
+                var langNames = getLangNames(recSource);
 
                 html += '<div class="aw-hist-item">';
                 html += '<div class="aw-hist-info">';
-                html += '<strong>' + esc(rec.SeriesTitle) + ' ' + seLabel;
+                html += '<strong><img class="aw-source-logo" src="' + siteLogoUrl(recSource) + '" onerror="this.style.display=\'none\'" style="height:1em"> ' + esc(rec.SeriesTitle) + ' ' + seLabel;
                 if (title) html += ' - ' + esc(title);
                 html += '</strong>';
                 html += '<small>' + esc(rec.Provider) + ' \u00B7 ' + esc(langNames[rec.Language] || rec.Language);
@@ -847,7 +952,6 @@ export default function (view, params) {
                 }
             }
 
-            // Show "load more" if we got a full page
             var moreContainer = container.querySelector('.aw-hist-more');
             if (moreContainer) moreContainer.remove();
 
@@ -858,8 +962,9 @@ export default function (view, params) {
         },
 
         goBack: function () {
+            this.currentSeriesUrl = null;
+            this.currentSeriesSource = null;
             if (this.browseReturnTo) {
-                // Return to browse tab
                 this.switchTab('browse');
                 this.browseReturnTo = null;
             } else if (this.lastSearchResults) {

@@ -4,13 +4,27 @@ export default function (view, params) {
     function loadConfig() {
         Dashboard.showLoadingMsg();
         ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-            view.querySelector('#txtDownloadPath').value = config.DownloadPath || '';
-            view.querySelector('#selLanguage').value = config.PreferredLanguage || '1';
-            view.querySelector('#selProvider').value = config.PreferredProvider || 'VOE';
-            view.querySelector('#selFallbackProvider').value = config.FallbackProvider || '';
+            // General
             view.querySelector('#txtMaxDownloads').value = config.MaxConcurrentDownloads || 2;
             view.querySelector('#txtMaxRetries').value = config.MaxRetries != null ? config.MaxRetries : 3;
             view.querySelector('#chkAutoScan').checked = config.AutoScanLibrary !== false;
+
+            // AniWorld
+            var aw = config.AniWorldConfig || {};
+            view.querySelector('#chkAniWorldEnabled').checked = aw.Enabled !== false;
+            view.querySelector('#txtAniWorldDownloadPath').value = aw.DownloadPath || config.DownloadPath || '';
+            view.querySelector('#selAniWorldLanguage').value = aw.PreferredLanguage || config.PreferredLanguage || '1';
+            view.querySelector('#selAniWorldProvider').value = aw.PreferredProvider || config.PreferredProvider || 'VOE';
+            view.querySelector('#selAniWorldFallback').value = aw.FallbackProvider || config.FallbackProvider || '';
+
+            // s.to
+            var sto = config.StoConfig || {};
+            view.querySelector('#chkStoEnabled').checked = sto.Enabled === true;
+            view.querySelector('#txtStoDownloadPath').value = sto.DownloadPath || '';
+            view.querySelector('#selStoLanguage').value = sto.PreferredLanguage || '1';
+            view.querySelector('#selStoProvider').value = sto.PreferredProvider || 'VOE';
+            view.querySelector('#selStoFallback').value = sto.FallbackProvider || '';
+
             Dashboard.hideLoadingMsg();
         });
     }
@@ -18,13 +32,32 @@ export default function (view, params) {
     function saveConfig() {
         Dashboard.showLoadingMsg();
         ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-            config.DownloadPath = view.querySelector('#txtDownloadPath').value.trim();
-            config.PreferredLanguage = view.querySelector('#selLanguage').value;
-            config.PreferredProvider = view.querySelector('#selProvider').value;
-            config.FallbackProvider = view.querySelector('#selFallbackProvider').value;
+            // General
             config.MaxConcurrentDownloads = parseInt(view.querySelector('#txtMaxDownloads').value, 10) || 2;
             config.MaxRetries = parseInt(view.querySelector('#txtMaxRetries').value, 10) || 0;
             config.AutoScanLibrary = view.querySelector('#chkAutoScan').checked;
+
+            // AniWorld
+            if (!config.AniWorldConfig) config.AniWorldConfig = {};
+            config.AniWorldConfig.Enabled = view.querySelector('#chkAniWorldEnabled').checked;
+            config.AniWorldConfig.DownloadPath = view.querySelector('#txtAniWorldDownloadPath').value.trim();
+            config.AniWorldConfig.PreferredLanguage = view.querySelector('#selAniWorldLanguage').value;
+            config.AniWorldConfig.PreferredProvider = view.querySelector('#selAniWorldProvider').value;
+            config.AniWorldConfig.FallbackProvider = view.querySelector('#selAniWorldFallback').value;
+
+            // Keep legacy flat fields in sync for backward compat
+            config.DownloadPath = config.AniWorldConfig.DownloadPath;
+            config.PreferredLanguage = config.AniWorldConfig.PreferredLanguage;
+            config.PreferredProvider = config.AniWorldConfig.PreferredProvider;
+            config.FallbackProvider = config.AniWorldConfig.FallbackProvider;
+
+            // s.to
+            if (!config.StoConfig) config.StoConfig = {};
+            config.StoConfig.Enabled = view.querySelector('#chkStoEnabled').checked;
+            config.StoConfig.DownloadPath = view.querySelector('#txtStoDownloadPath').value.trim();
+            config.StoConfig.PreferredLanguage = view.querySelector('#selStoLanguage').value;
+            config.StoConfig.PreferredProvider = view.querySelector('#selStoProvider').value;
+            config.StoConfig.FallbackProvider = view.querySelector('#selStoFallback').value;
 
             ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                 Dashboard.processPluginConfigurationUpdateResult();

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.AniWorld.Extractors;
 using Jellyfin.Plugin.AniWorld.Helpers;
@@ -16,7 +17,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.AniWorld.Services;
 
 /// <summary>
-/// Manages downloads from aniworld.to using ffmpeg.
+/// Manages downloads from streaming sites using ffmpeg.
 /// Supports retry with exponential backoff, provider fallback,
 /// automatic Jellyfin library scanning after completion,
 /// and persistent download history via SQLite.
@@ -27,34 +28,71 @@ public class DownloadService
     private const int BaseRetryDelayMs = 3000;
 
     private readonly AniWorldService _aniWorldService;
+    private readonly StoService _stoService;
     private readonly DownloadHistoryService _historyService;
     private readonly IEnumerable<IStreamExtractor> _extractors;
     private readonly ILibraryMonitor _libraryMonitor;
     private readonly ILogger<DownloadService> _logger;
     private readonly ConcurrentDictionary<string, DownloadTask> _activeTasks = new();
-    private readonly SemaphoreSlim _downloadSemaphore;
+    private readonly Channel<DownloadTask> _downloadQueue = Channel.CreateUnbounded<DownloadTask>(
+        new UnboundedChannelOptions { SingleReader = false });
+    private long _sequenceCounter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DownloadService"/> class.
     /// </summary>
     public DownloadService(
         AniWorldService aniWorldService,
+        StoService stoService,
         DownloadHistoryService historyService,
         IEnumerable<IStreamExtractor> extractors,
         ILibraryMonitor libraryMonitor,
         ILogger<DownloadService> logger)
     {
         _aniWorldService = aniWorldService;
+        _stoService = stoService;
         _historyService = historyService;
         _extractors = extractors;
         _libraryMonitor = libraryMonitor;
         _logger = logger;
 
-        var maxDownloads = Plugin.Instance?.Configuration.MaxConcurrentDownloads ?? 2;
-        _downloadSemaphore = new SemaphoreSlim(maxDownloads, maxDownloads);
-
         // Mark any downloads that were in-progress when Jellyfin last shut down
         _historyService.MarkInterruptedDownloads();
+
+        // Start FIFO worker tasks for concurrent downloads
+        var maxDownloads = Plugin.Instance?.Configuration.MaxConcurrentDownloads ?? 2;
+        for (int i = 0; i < maxDownloads; i++)
+        {
+            _ = Task.Run(() => ProcessDownloadQueueAsync());
+        }
+    }
+
+    /// <summary>
+    /// Worker loop that processes downloads from the FIFO queue.
+    /// </summary>
+    private async Task ProcessDownloadQueueAsync()
+    {
+        await foreach (var task in _downloadQueue.Reader.ReadAllAsync().ConfigureAwait(false))
+        {
+            try
+            {
+                await ExecuteDownloadWithRetryAsync(task, task.CancellationSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled error processing download {TaskId}", task.Id);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the correct streaming service for a source.
+    /// </summary>
+    private StreamingSiteService GetService(string source)
+    {
+        return string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase)
+            ? _stoService
+            : _aniWorldService;
     }
 
     /// <summary>
@@ -62,7 +100,7 @@ public class DownloadService
     /// </summary>
     public List<DownloadTask> GetActiveDownloads()
     {
-        return _activeTasks.Values.ToList();
+        return _activeTasks.Values.OrderBy(t => t.SequenceNumber).ToList();
     }
 
     /// <summary>
@@ -85,12 +123,13 @@ public class DownloadService
     /// <summary>
     /// Starts a download for an episode.
     /// </summary>
-    public Task<string?> StartDownloadAsync(
+    public async Task<string?> StartDownloadAsync(
         string episodeUrl,
         string languageKey,
         string provider,
         string outputPath,
         string seriesTitle,
+        string source = "aniworld",
         CancellationToken cancellationToken = default)
     {
         // Prevent duplicate: reject if this episode is already queued or downloading
@@ -100,7 +139,7 @@ public class DownloadService
                 or DownloadStatus.Downloading or DownloadStatus.Retrying);
         if (existing != null)
         {
-            return Task.FromResult<string?>(null);
+            return null;
         }
 
         var taskId = Guid.NewGuid().ToString("N")[..12];
@@ -117,20 +156,24 @@ public class DownloadService
             SeriesTitle = seriesTitle,
             Season = season,
             Episode = episode,
+            Source = source,
             Status = DownloadStatus.Queued,
             StartedAt = DateTime.UtcNow,
+            SequenceNumber = Interlocked.Increment(ref _sequenceCounter),
             MaxRetries = Plugin.Instance?.Configuration.MaxRetries ?? DefaultMaxRetries,
         };
+
+        task.CancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         _activeTasks[taskId] = task;
 
         // Persist initial state to SQLite
         _historyService.SaveDownload(task, seriesTitle, season, episode);
 
-        // Run in background
-        _ = Task.Run(async () => await ExecuteDownloadWithRetryAsync(task, cancellationToken).ConfigureAwait(false), cancellationToken);
+        // Enqueue for FIFO processing by worker tasks
+        await _downloadQueue.Writer.WriteAsync(task, cancellationToken).ConfigureAwait(false);
 
-        return Task.FromResult(taskId);
+        return taskId;
     }
 
     /// <summary>
@@ -200,10 +243,11 @@ public class DownloadService
             task.Error = null;
             task.RetryCount = 0;
             task.Progress = 0;
+            task.CancellationSource = new CancellationTokenSource();
 
             _historyService.UpdateDownload(task);
 
-            _ = Task.Run(async () => await ExecuteDownloadWithRetryAsync(task, CancellationToken.None).ConfigureAwait(false));
+            _downloadQueue.Writer.TryWrite(task);
             return true;
         }
 
@@ -215,7 +259,8 @@ public class DownloadService
     /// </summary>
     private async Task ExecuteDownloadWithRetryAsync(DownloadTask task, CancellationToken externalToken)
     {
-        task.CancellationSource = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
+        // Use the existing CancellationSource if set, otherwise create one
+        task.CancellationSource ??= CancellationTokenSource.CreateLinkedTokenSource(externalToken);
         var token = task.CancellationSource.Token;
 
         var originalProvider = task.Provider;
@@ -224,7 +269,7 @@ public class DownloadService
         if (!await TryDownloadWithRetriesAsync(task, token).ConfigureAwait(false))
         {
             var config = Plugin.Instance?.Configuration;
-            var fallbackProvider = config?.FallbackProvider ?? string.Empty;
+            var fallbackProvider = config?.GetFallbackProvider(task.Source) ?? string.Empty;
 
             if (!string.IsNullOrEmpty(fallbackProvider) &&
                 !fallbackProvider.Equals("None", StringComparison.OrdinalIgnoreCase) &&
@@ -352,112 +397,102 @@ public class DownloadService
 
     private async Task ExecuteDownloadAsync(DownloadTask task, CancellationToken token)
     {
-        bool semaphoreAcquired = false;
-        try
+        task.Status = DownloadStatus.Resolving;
+        _historyService.UpdateDownload(task);
+
+        // Route to the correct service based on source
+        var service = GetService(task.Source);
+
+        // 1. Get episode details
+        var details = await service.GetEpisodeDetailsAsync(task.EpisodeUrl, token).ConfigureAwait(false);
+        task.EpisodeTitle = details.TitleEn ?? details.TitleDe ?? "Unknown";
+
+        // 2. Rename output path to include episode title if available
+        var newPath = PathHelper.InsertEpisodeTitleInPath(task.OutputPath, task.EpisodeTitle);
+        if (newPath != task.OutputPath)
         {
-            await _downloadSemaphore.WaitAsync(token).ConfigureAwait(false);
-            semaphoreAcquired = true;
-            task.Status = DownloadStatus.Resolving;
-            _historyService.UpdateDownload(task);
+            task.OutputPath = newPath;
+            _logger.LogDebug("Updated output path with episode title: {Path}", newPath);
+        }
 
-            // 1. Get episode details
-            var details = await _aniWorldService.GetEpisodeDetailsAsync(task.EpisodeUrl, token).ConfigureAwait(false);
-            task.EpisodeTitle = details.TitleEn ?? details.TitleDe ?? "Unknown";
-
-            // 2. Rename output path to include episode title if available
-            var newPath = PathHelper.InsertEpisodeTitleInPath(task.OutputPath, task.EpisodeTitle);
-            if (newPath != task.OutputPath)
-            {
-                task.OutputPath = newPath;
-                _logger.LogDebug("Updated output path with episode title: {Path}", newPath);
-            }
-
-            if (!details.ProvidersByLanguage.TryGetValue(task.Language, out var providers) ||
-                !providers.TryGetValue(task.Provider, out var redirectUrl))
-            {
-                var fallbackResult = TryFindFallbackProvider(details, task.Language, task.Provider);
-                if (fallbackResult == null)
-                {
-                    throw new InvalidOperationException(
-                        $"Provider {task.Provider} not available for language key {task.Language}, and no fallback found");
-                }
-
-                redirectUrl = fallbackResult.Value.url;
-                task.Provider = fallbackResult.Value.provider;
-                _logger.LogInformation("Falling back to provider {Provider} for {Url}", task.Provider, task.EpisodeUrl);
-            }
-
-            // 3. Resolve redirect to provider embed URL
-            var embedUrl = await _aniWorldService.ResolveRedirectAsync(redirectUrl, token).ConfigureAwait(false);
-            _logger.LogInformation("Resolved to embed URL: {EmbedUrl}", embedUrl);
-
-            // 4. Extract direct stream URL
-            var extractor = _extractors.FirstOrDefault(e =>
-                e.ProviderName.Equals(task.Provider, StringComparison.OrdinalIgnoreCase));
-
-            if (extractor == null)
-            {
-                throw new InvalidOperationException($"No extractor available for provider: {task.Provider}");
-            }
-
-            task.Status = DownloadStatus.Extracting;
-            _historyService.UpdateDownload(task);
-            var streamUrl = await extractor.GetDirectLinkAsync(embedUrl, token).ConfigureAwait(false);
-
-            if (string.IsNullOrEmpty(streamUrl))
-            {
-                throw new InvalidOperationException("Failed to extract stream URL from provider");
-            }
-
-            // Validate the extracted stream URL is a real HTTP(S) URL
-            if (!Uri.TryCreate(streamUrl, UriKind.Absolute, out var streamUri) ||
-                (streamUri.Scheme != Uri.UriSchemeHttp && streamUri.Scheme != Uri.UriSchemeHttps))
-            {
-                throw new InvalidOperationException("Extracted stream URL is not a valid HTTP(S) URL");
-            }
-
-            _logger.LogInformation("Stream URL: {StreamUrl}", streamUrl);
-
-            // 5. Download with ffmpeg
-            task.Status = DownloadStatus.Downloading;
-            task.StreamUrl = streamUrl;
-            _historyService.UpdateDownload(task);
-
-            var dir = Path.GetDirectoryName(task.OutputPath);
-            if (!string.IsNullOrEmpty(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-
-            await DownloadWithFfmpegAsync(task, token).ConfigureAwait(false);
-
-            if (token.IsCancellationRequested)
-            {
-                task.Status = DownloadStatus.Cancelled;
-                return;
-            }
-
-            // Verify the file exists and has content
-            var fileInfo = new FileInfo(task.OutputPath);
-            if (!fileInfo.Exists || fileInfo.Length < 1024)
+        if (!details.ProvidersByLanguage.TryGetValue(task.Language, out var providers) ||
+            !providers.TryGetValue(task.Provider, out var redirectUrl))
+        {
+            var fallbackResult = TryFindFallbackProvider(details, task.Language, task.Provider);
+            if (fallbackResult == null)
             {
                 throw new InvalidOperationException(
-                    $"Downloaded file is missing or too small ({fileInfo.Length} bytes)");
+                    $"Provider {task.Provider} not available for language key {task.Language}, and no fallback found");
             }
 
-            task.Status = DownloadStatus.Completed;
-            task.CompletedAt = DateTime.UtcNow;
-            task.Progress = 100;
-            task.FileSizeBytes = fileInfo.Length;
-            _logger.LogInformation("Download completed: {Path} ({Size} bytes)", task.OutputPath, fileInfo.Length);
+            redirectUrl = fallbackResult.Value.url;
+            task.Provider = fallbackResult.Value.provider;
+            _logger.LogInformation("Falling back to provider {Provider} for {Url}", task.Provider, task.EpisodeUrl);
         }
-        finally
+
+        // 3. Resolve redirect to provider embed URL
+        var embedUrl = await service.ResolveRedirectAsync(redirectUrl, token).ConfigureAwait(false);
+        _logger.LogInformation("Resolved to embed URL: {EmbedUrl}", embedUrl);
+
+        // 4. Extract direct stream URL
+        var extractor = _extractors.FirstOrDefault(e =>
+            e.ProviderName.Equals(task.Provider, StringComparison.OrdinalIgnoreCase));
+
+        if (extractor == null)
         {
-            if (semaphoreAcquired)
-            {
-                _downloadSemaphore.Release();
-            }
+            throw new InvalidOperationException($"No extractor available for provider: {task.Provider}");
         }
+
+        task.Status = DownloadStatus.Extracting;
+        _historyService.UpdateDownload(task);
+        var streamUrl = await extractor.GetDirectLinkAsync(embedUrl, token).ConfigureAwait(false);
+
+        if (string.IsNullOrEmpty(streamUrl))
+        {
+            throw new InvalidOperationException("Failed to extract stream URL from provider");
+        }
+
+        // Validate the extracted stream URL is a real HTTP(S) URL
+        if (!Uri.TryCreate(streamUrl, UriKind.Absolute, out var streamUri) ||
+            (streamUri.Scheme != Uri.UriSchemeHttp && streamUri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new InvalidOperationException("Extracted stream URL is not a valid HTTP(S) URL");
+        }
+
+        _logger.LogInformation("Stream URL: {StreamUrl}", streamUrl);
+
+        // 5. Download with ffmpeg
+        task.Status = DownloadStatus.Downloading;
+        task.StreamUrl = streamUrl;
+        _historyService.UpdateDownload(task);
+
+        var dir = Path.GetDirectoryName(task.OutputPath);
+        if (!string.IsNullOrEmpty(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        await DownloadWithFfmpegAsync(task, token).ConfigureAwait(false);
+
+        if (token.IsCancellationRequested)
+        {
+            task.Status = DownloadStatus.Cancelled;
+            return;
+        }
+
+        // Verify the file exists and has content
+        var fileInfo = new FileInfo(task.OutputPath);
+        if (!fileInfo.Exists || fileInfo.Length < 1024)
+        {
+            throw new InvalidOperationException(
+                $"Downloaded file is missing or too small ({fileInfo.Length} bytes)");
+        }
+
+        task.Status = DownloadStatus.Completed;
+        task.CompletedAt = DateTime.UtcNow;
+        task.Progress = 100;
+        task.FileSizeBytes = fileInfo.Length;
+        _logger.LogInformation("Download completed: {Path} ({Size} bytes)", task.OutputPath, fileInfo.Length);
     }
 
     /// <summary>
@@ -834,6 +869,13 @@ public class DownloadTask
 
     /// <summary>Gets or sets the file size in bytes.</summary>
     public long FileSizeBytes { get; set; }
+
+    /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
+    public string Source { get; set; } = "aniworld";
+
+    /// <summary>Gets or sets the insertion order for stable sorting.</summary>
+    [JsonIgnore]
+    public long SequenceNumber { get; set; }
 
     /// <summary>Gets or sets the cancellation token source.</summary>
     [JsonIgnore]

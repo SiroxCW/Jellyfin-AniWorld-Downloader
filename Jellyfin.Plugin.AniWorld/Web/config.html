@@ -12,64 +12,15 @@
                         <h2 class="sectionTitle">AniWorld Downloader Settings</h2>
                     </div>
 
+                    <!-- General Settings -->
                     <div class="verticalSection">
-                        <h3 class="sectionTitle">Download Settings</h3>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtDownloadPath">Download Path</label>
-                            <input is="emby-input" type="text" id="txtDownloadPath"
-                                   placeholder="/media/anime" />
-                            <div class="fieldDescription">
-                                Base directory for downloaded anime files. Files will be organized as:
-                                <code>DownloadPath/SeriesName/Season XX/SeriesName - SXXEXX.mkv</code>
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selLanguage">Preferred Language</label>
-                            <select is="emby-select" id="selLanguage">
-                                <option value="1">German Dub (Deutsch)</option>
-                                <option value="2">English Sub (Eng Sub)</option>
-                                <option value="3">German Sub (Ger Sub)</option>
-                            </select>
-                            <div class="fieldDescription">Default language for downloads.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selProvider">Preferred Provider</label>
-                            <select is="emby-select" id="selProvider">
-                                <option value="VOE">VOE (recommended)</option>
-                                <option value="Filemoon">Filemoon</option>
-                                <option value="Vidmoly">Vidmoly</option>
-                                <option value="Vidoza">Vidoza</option>
-                            </select>
-                            <div class="fieldDescription">Default streaming provider. VOE usually has the best quality and availability.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selFallbackProvider">Fallback Provider</label>
-                            <select is="emby-select" id="selFallbackProvider">
-                                <option value="">None (no fallback)</option>
-                                <option value="VOE">VOE</option>
-                                <option value="Filemoon">Filemoon</option>
-                                <option value="Vidmoly">Vidmoly</option>
-                                <option value="Vidoza">Vidoza</option>
-                            </select>
-                            <div class="fieldDescription">
-                                If all retries with the preferred provider fail, the download will be retried
-                                with this provider. Ignored if set to the same as the preferred provider.
-                            </div>
-                        </div>
+                        <h3 class="sectionTitle">General</h3>
 
                         <div class="inputContainer">
                             <label class="inputLabel" for="txtMaxDownloads">Max Concurrent Downloads</label>
                             <input is="emby-input" type="number" id="txtMaxDownloads" min="1" max="5" />
                             <div class="fieldDescription">Maximum number of simultaneous downloads (1-5). Lower values are recommended to avoid rate limiting.</div>
                         </div>
-                    </div>
-
-                    <div class="verticalSection">
-                        <h3 class="sectionTitle">Reliability</h3>
 
                         <div class="inputContainer">
                             <label class="inputLabel" for="txtMaxRetries">Max Retry Attempts</label>
@@ -88,6 +39,126 @@
                             <div class="fieldDescription checkboxFieldDescription">
                                 Automatically trigger a Jellyfin library scan when a download completes.
                                 This makes new episodes appear in your library immediately.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AniWorld Settings -->
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">AniWorld Downloader (aniworld.to)</h3>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkAniWorldEnabled" />
+                                <span>Enable AniWorld Downloader</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Enable searching and downloading anime from aniworld.to.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtAniWorldDownloadPath">Download Path</label>
+                            <input is="emby-input" type="text" id="txtAniWorldDownloadPath"
+                                   placeholder="/media/anime" />
+                            <div class="fieldDescription">
+                                Base directory for downloaded anime files. Files will be organized as:
+                                <code>DownloadPath/SeriesName/Season XX/SeriesName - SXXEXX.mkv</code>
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selAniWorldLanguage">Preferred Language</label>
+                            <select is="emby-select" id="selAniWorldLanguage">
+                                <option value="1">German Dub (Deutsch)</option>
+                                <option value="2">English Sub (Eng Sub)</option>
+                                <option value="3">German Sub (Ger Sub)</option>
+                            </select>
+                            <div class="fieldDescription">Default language for AniWorld downloads.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selAniWorldProvider">Preferred Provider</label>
+                            <select is="emby-select" id="selAniWorldProvider">
+                                <option value="VOE">VOE (recommended)</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">Default streaming provider for AniWorld. VOE usually has the best quality and availability.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selAniWorldFallback">Fallback Provider</label>
+                            <select is="emby-select" id="selAniWorldFallback">
+                                <option value="">None (no fallback)</option>
+                                <option value="VOE">VOE</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">
+                                If all retries with the preferred provider fail, the download will be retried
+                                with this provider.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- s.to Settings -->
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">s.to Downloader (SerienStream)</h3>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkStoEnabled" />
+                                <span>Enable s.to Downloader</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Enable searching and downloading TV series from s.to.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtStoDownloadPath">Download Path</label>
+                            <input is="emby-input" type="text" id="txtStoDownloadPath"
+                                   placeholder="/media/series" />
+                            <div class="fieldDescription">
+                                Base directory for downloaded series files. Leave empty to use the AniWorld download path.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selStoLanguage">Preferred Language</label>
+                            <select is="emby-select" id="selStoLanguage">
+                                <option value="1">German Dub (Deutsch)</option>
+                                <option value="2">English Dub (English)</option>
+                            </select>
+                            <div class="fieldDescription">Default language for s.to downloads.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selStoProvider">Preferred Provider</label>
+                            <select is="emby-select" id="selStoProvider">
+                                <option value="VOE">VOE (recommended)</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">Default streaming provider for s.to.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selStoFallback">Fallback Provider</label>
+                            <select is="emby-select" id="selStoFallback">
+                                <option value="">None (no fallback)</option>
+                                <option value="VOE">VOE</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">
+                                If all retries with the preferred provider fail, the download will be retried
+                                with this provider.
                             </div>
                         </div>
                     </div>
