@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Linq;
 using System.Net.Mime;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.AniWorld.Helpers;
@@ -508,9 +510,39 @@ public class AniWorldController : ControllerBase
             return BadRequest("Invalid URL. Only https://aniworld.to URLs are accepted.");
         }
 
-        var lang = language ?? Plugin.Instance?.Configuration.PreferredLanguage ?? "1";
-        var downloaded = _historyService.HasCompletedDownload(url);
-        return Ok(new { downloaded, url, language = lang });
+        var completedLanguage = _historyService.GetCompletedLanguage(url);
+        return Ok(new { downloaded = completedLanguage != null, language = completedLanguage, url });
+    }
+
+    /// <summary>
+    /// Serves a language flag SVG by language key.
+    /// </summary>
+    [HttpGet("Flag/{lang}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AllowAnonymous]
+    public ActionResult GetFlag(string lang)
+    {
+        var resourceName = lang switch
+        {
+            "1" => "Jellyfin.Plugin.AniWorld.Web.german.svg",
+            "2" => "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
+            "3" => "Jellyfin.Plugin.AniWorld.Web.japanese-german.svg",
+            _ => null
+        };
+
+        if (resourceName == null)
+        {
+            return NotFound();
+        }
+
+        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
+        if (stream == null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "image/svg+xml");
     }
 
     /// <summary>

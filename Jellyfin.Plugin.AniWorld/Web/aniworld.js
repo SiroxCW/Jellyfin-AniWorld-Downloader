@@ -333,7 +333,7 @@ export default function (view, params) {
                 html += '<div class="aw-ep" id="' + epId + '">';
                 html += '<span class="aw-ep-num">' + label + '</span>';
                 html += '<span class="aw-ep-title" id="' + epId + '-title">Loading...</span>';
-                html += '<span class="aw-ep-downloaded" id="' + epId + '-dl" style="display:none">\u2713 Downloaded</span>';
+                html += '<span class="aw-ep-downloaded" id="' + epId + '-dl" style="display:none"></span>';
                 html += '<div class="aw-ep-actions">';
                 html += '<button class="aw-btn aw-btn-primary aw-btn-sm" onclick="window.AW.downloadEpisode(\'' + encodeURIComponent(ep.Url) + '\')">\u2B07\uFE0F Download</button>';
                 html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.toggleProviders(\'' + encodeURIComponent(ep.Url) + '\', \'' + epId + '\')">Providers</button>';
@@ -389,9 +389,12 @@ export default function (view, params) {
                 type: 'GET',
                 dataType: 'json'
             }).then(function (result) {
-                if (result && result.downloaded) {
+                if (result && result.downloaded && result.language) {
                     var badge = view.querySelector('#' + epId + '-dl');
-                    if (badge) badge.style.display = '';
+                    if (badge) {
+                        badge.innerHTML = '\u2713 <img src="' + ApiClient.getUrl('AniWorld/Flag/' + result.language) + '">';
+                        badge.style.display = '';
+                    }
                 }
             }).catch(function () { /* ignore */ });
         },

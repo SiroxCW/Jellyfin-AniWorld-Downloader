@@ -159,8 +159,8 @@ public class DownloadHistoryService : IDisposable
     }
 
     /// <summary>
-    /// Checks if an episode has already been successfully downloaded.
-    /// Also verifies the file still exists on disk — if missing, marks the record as deleted.
+    /// Checks if an episode's most recent completed download matches the requested language.
+    /// Since re-downloading in a different language overwrites the file, only the latest matters.
     /// </summary>
     public bool IsAlreadyDownloaded(string episodeUrl, string language)
     {
@@ -168,36 +168,16 @@ public class DownloadHistoryService : IDisposable
         {
             using var cmd = _db.CreateCommand();
             cmd.CommandText = @"
-                SELECT id, output_path FROM download_history
-                WHERE episode_url = @url AND language = @lang AND status = 'Completed'
+                SELECT language FROM download_history
+                WHERE episode_url = @url AND status = 'Completed'
                 ORDER BY completed_at DESC
                 LIMIT 1
             ";
             cmd.Parameters.AddWithValue("@url", episodeUrl);
-            cmd.Parameters.AddWithValue("@lang", language);
 
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read())
-            {
-                return false;
-            }
-
-            var recordId = reader.GetString(0);
-            var outputPath = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
-
-            // Verify file actually exists on disk
-            if (!string.IsNullOrEmpty(outputPath) && !File.Exists(outputPath))
-            {
-                _logger.LogInformation(
-                    "Download record {Id} marked completed but file missing: {Path}. Invalidating record.",
-                    recordId, outputPath);
-
-                // Mark the record so it no longer counts as "downloaded"
-                MarkRecordFileDeleted(recordId);
-                return false;
-            }
-
-            return true;
+            var result = cmd.ExecuteScalar();
+            return result is string lastLang &&
+                   lastLang.Equals(language, StringComparison.Ordinal);
         }
         catch (Exception ex)
         {
@@ -207,49 +187,29 @@ public class DownloadHistoryService : IDisposable
     }
 
     /// <summary>
-    /// Checks if an episode has any completed download record, regardless of language.
-    /// Used for the UI badge — shows whether the episode was ever downloaded.
+    /// Returns the language of the most recent completed download for this episode.
+    /// Since re-downloading in a different language overwrites the file, only the latest matters.
     /// </summary>
-    public bool HasCompletedDownload(string episodeUrl)
+    public string? GetCompletedLanguage(string episodeUrl)
     {
         try
         {
             using var cmd = _db.CreateCommand();
             cmd.CommandText = @"
-                SELECT 1 FROM download_history
+                SELECT language FROM download_history
                 WHERE episode_url = @url AND status = 'Completed'
+                ORDER BY completed_at DESC
                 LIMIT 1
             ";
             cmd.Parameters.AddWithValue("@url", episodeUrl);
 
-            return cmd.ExecuteScalar() != null;
+            var result = cmd.ExecuteScalar();
+            return result as string;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Marks a completed download record as having its file deleted from disk.
-    /// </summary>
-    private void MarkRecordFileDeleted(string recordId)
-    {
-        try
-        {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = @"
-                UPDATE download_history
-                SET status = 'FileDeleted', error = 'File was deleted from disk'
-                WHERE id = @id
-            ";
-            cmd.Parameters.AddWithValue("@id", recordId);
-            cmd.ExecuteNonQuery();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to mark record {Id} as file-deleted", recordId);
+            return null;
         }
     }
 
