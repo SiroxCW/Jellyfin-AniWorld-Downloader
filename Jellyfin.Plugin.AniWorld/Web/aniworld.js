@@ -596,6 +596,21 @@ export default function (view, params) {
                 return;
             }
 
+            // Sort: active statuses first by priority, then by season/episode
+            // Terminal statuses (Completed/Failed/Cancelled) share same priority, sorted newest first
+            var statusOrder = { Downloading: 0, Extracting: 1, Resolving: 1, Retrying: 2, Queued: 3, Completed: 4, Failed: 4, Cancelled: 4 };
+            downloads.sort(function (a, b) {
+                var sa = statusOrder[a.Status] !== undefined ? statusOrder[a.Status] : 9;
+                var sb = statusOrder[b.Status] !== undefined ? statusOrder[b.Status] : 9;
+                if (sa !== sb) return sa - sb;
+                // Terminal statuses: newest (most recently started) first
+                if (sa === 4) {
+                    return (b.StartedAt || '').localeCompare(a.StartedAt || '');
+                }
+                if ((a.Season || 0) !== (b.Season || 0)) return (a.Season || 0) - (b.Season || 0);
+                return (a.Episode || 0) - (b.Episode || 0);
+            });
+
             var hasCompleted = downloads.some(function (dl) {
                 return ['Completed', 'Failed', 'Cancelled'].indexOf(dl.Status) !== -1;
             });
