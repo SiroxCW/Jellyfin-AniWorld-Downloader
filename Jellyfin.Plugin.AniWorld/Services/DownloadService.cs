@@ -666,7 +666,7 @@ public class DownloadService
         var sizePattern = new Regex(@"size=\s*(?<size>\d+)kB", RegexOptions.Compiled);
         TimeSpan? totalDuration = null;
 
-        _ = Task.Run(async () =>
+        var stderrTask = Task.Run(async () =>
         {
             while (!process.StandardError.EndOfStream)
             {
@@ -702,6 +702,7 @@ public class DownloadService
         try
         {
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            await stderrTask.ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
