@@ -80,6 +80,10 @@ export default function (view, params) {
                 this.loadHistory(true);
             }
 
+            if (tab === 'search' && this.currentSeriesUrl) {
+                this.showSeries(encodeURIComponent(this.currentSeriesUrl), this.currentSeriesTitle);
+            }
+
             if (tab === 'browse' && !this.browseLoaded.popular) {
                 this.loadBrowseSection('popular');
             }
