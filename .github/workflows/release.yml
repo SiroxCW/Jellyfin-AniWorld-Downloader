@@ -61,7 +61,16 @@ jobs:
 
           with open("Jellyfin.Plugin.AniWorld/meta.json", "r") as f:
               meta = json.load(f)
-          changelog = meta.get("changelog", "")
+          full_changelog = meta.get("changelog", "")
+
+          # Extract only the current version's section from the cumulative changelog
+          import re
+          sections = re.split(r'\n(?=v\d+\.\d+\.\d+\.\d+)', full_changelog)
+          changelog = ""
+          for section in sections:
+              if section.startswith(f"v{version}"):
+                  changelog = section.strip()
+                  break
 
           with open("manifest.json", "r") as f:
               manifest = json.load(f)
