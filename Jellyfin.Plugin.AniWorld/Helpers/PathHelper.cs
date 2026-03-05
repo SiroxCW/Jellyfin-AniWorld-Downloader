@@ -12,24 +12,25 @@ namespace Jellyfin.Plugin.AniWorld.Helpers;
 public static class PathHelper
 {
     /// <summary>
-    /// Regex to extract season and episode numbers from an aniworld.to episode URL.
+    /// Regex to extract season and episode numbers from an episode URL.
     /// </summary>
     public static readonly Regex SeasonEpisodeFromUrl = new(
         @"/staffel-(?<season>\d+)/episode-(?<episode>\d+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
-    /// Regex to extract movie number from an aniworld.to movie URL.
+    /// Regex to extract movie number from a movie URL.
     /// </summary>
     public static readonly Regex MovieFromUrl = new(
         @"/filme/film-(?<num>\d+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
-    /// Regex to extract the series slug from an aniworld.to URL.
+    /// Regex to extract the series slug from a URL.
+    /// Supports both /anime/stream/{slug} (aniworld) and /serie/{slug} (s.to).
     /// </summary>
     public static readonly Regex SeriesSlugFromUrl = new(
-        @"/anime/stream/(?<slug>[^/]+)",
+        @"/(?:anime/stream|serie)/(?<slug>[^/]+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
@@ -65,7 +66,7 @@ public static class PathHelper
     }
 
     /// <summary>
-    /// Parses season and episode numbers from an aniworld.to URL.
+    /// Parses season and episode numbers from an episode URL.
     /// Returns (0, N) for movies and (0, 0) for unrecognised URLs.
     /// </summary>
     public static (int Season, int Episode) ParseSeasonEpisode(string url)

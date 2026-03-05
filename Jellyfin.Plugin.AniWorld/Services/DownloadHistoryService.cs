@@ -70,6 +70,31 @@ public class DownloadHistoryService : IDisposable
             CREATE INDEX IF NOT EXISTS idx_dh_started ON download_history(started_at);
         ";
         cmd.ExecuteNonQuery();
+
+        // Migration: add source column if it doesn't exist
+        MigrateAddSourceColumn();
+    }
+
+    private void MigrateAddSourceColumn()
+    {
+        try
+        {
+            using var checkCmd = _db.CreateCommand();
+            checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('download_history') WHERE name='source'";
+            var exists = Convert.ToInt64(checkCmd.ExecuteScalar()) > 0;
+
+            if (!exists)
+            {
+                using var alterCmd = _db.CreateCommand();
+                alterCmd.CommandText = "ALTER TABLE download_history ADD COLUMN source TEXT NOT NULL DEFAULT 'aniworld'";
+                alterCmd.ExecuteNonQuery();
+                _logger.LogInformation("Migrated download_history: added source column");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to migrate source column (may already exist)");
+        }
     }
 
     /// <summary>
@@ -84,11 +109,11 @@ public class DownloadHistoryService : IDisposable
                 INSERT OR REPLACE INTO download_history
                     (id, episode_url, series_title, episode_title, season, episode,
                      provider, language, output_path, status, progress,
-                     file_size_bytes, error, retry_count, max_retries, started_at, completed_at)
+                     file_size_bytes, error, retry_count, max_retries, started_at, completed_at, source)
                 VALUES
                     (@id, @url, @series, @epTitle, @season, @episode,
                      @provider, @language, @path, @status, @progress,
-                     @size, @error, @retry, @maxRetry, @started, @completed)
+                     @size, @error, @retry, @maxRetry, @started, @completed, @source)
             ";
             cmd.Parameters.AddWithValue("@id", task.Id);
             cmd.Parameters.AddWithValue("@url", task.EpisodeUrl);
@@ -109,6 +134,7 @@ public class DownloadHistoryService : IDisposable
             cmd.Parameters.AddWithValue("@completed", task.CompletedAt.HasValue
                 ? (object)task.CompletedAt.Value.ToString("o")
                 : DBNull.Value);
+            cmd.Parameters.AddWithValue("@source", task.Source ?? "aniworld");
             cmd.ExecuteNonQuery();
         }
         catch (Exception ex)
@@ -135,7 +161,8 @@ public class DownloadHistoryService : IDisposable
                     file_size_bytes = @size,
                     error = @error,
                     retry_count = @retry,
-                    completed_at = @completed
+                    completed_at = @completed,
+                    source = @source
                 WHERE id = @id
             ";
             cmd.Parameters.AddWithValue("@id", task.Id);
@@ -150,6 +177,7 @@ public class DownloadHistoryService : IDisposable
             cmd.Parameters.AddWithValue("@completed", task.CompletedAt.HasValue
                 ? (object)task.CompletedAt.Value.ToString("o")
                 : DBNull.Value);
+            cmd.Parameters.AddWithValue("@source", task.Source ?? "aniworld");
             cmd.ExecuteNonQuery();
         }
         catch (Exception ex)
@@ -238,7 +266,7 @@ public class DownloadHistoryService : IDisposable
             cmd.CommandText = $@"
                 SELECT id, episode_url, series_title, episode_title, season, episode,
                        provider, language, output_path, status, progress,
-                       file_size_bytes, error, retry_count, started_at, completed_at
+                       file_size_bytes, error, retry_count, started_at, completed_at, source
                 FROM download_history
                 {where}
                 ORDER BY started_at DESC
@@ -268,6 +296,7 @@ public class DownloadHistoryService : IDisposable
                     RetryCount = reader.GetInt32(13),
                     StartedAt = reader.GetString(14),
                     CompletedAt = reader.IsDBNull(15) ? null : reader.GetString(15),
+                    Source = reader.IsDBNull(16) ? "aniworld" : reader.GetString(16),
                 });
             }
         }
@@ -479,6 +508,9 @@ public class DownloadHistoryRecord
 
     /// <summary>Gets or sets the completed timestamp.</summary>
     public string? CompletedAt { get; set; }
+
+    /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
+    public string Source { get; set; } = "aniworld";
 }
 
 /// <summary>
