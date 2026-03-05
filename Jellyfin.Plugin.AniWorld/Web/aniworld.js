@@ -253,9 +253,6 @@ export default function (view, params) {
                     html += '<button class="aw-season" data-url="' + esc(movieUrl) + '" onclick="window.AW.loadSeason(\'' + encodeURIComponent(movieUrl) + '\', this)">\uD83C\uDFAC Movies</button>';
                 }
                 html += '</div>';
-                if (series.Seasons.length > 1) {
-                    html += '<button class="aw-btn aw-btn-success" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(seriesUrl) + '\')">\u2B07\uFE0F Download All Seasons</button>';
-                }
                 html += '</div>';
             }
 
@@ -315,13 +312,16 @@ export default function (view, params) {
             if (barContainer) {
                 var bar = '<div class="aw-season-actions">';
                 bar += '<span class="aw-ep-count">' + episodes.length + ' episode' + (episodes.length === 1 ? '' : 's') + '</span>';
-                bar += '<select id="aw-season-lang" class="aw-lang-select" title="Language for Download Season">';
+                bar += '<select id="aw-season-lang" class="aw-lang-select" title="Language for downloads">';
                 bar += '<option value="">\uD83C\uDF10 Use Settings Default</option>';
                 bar += '<option value="1">\uD83C\uDDE9\uD83C\uDDEA German Dub</option>';
                 bar += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Sub</option>';
                 bar += '<option value="3">\uD83C\uDDE9\uD83C\uDDEA German Sub</option>';
                 bar += '</select>';
                 bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')">\u2B07\uFE0F Download Season</button>';
+                if (AW.currentSeriesUrl) {
+                    bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')">\u2B07\uFE0F Download All Seasons</button>';
+                }
                 bar += '</div>';
                 barContainer.innerHTML = bar;
             }
