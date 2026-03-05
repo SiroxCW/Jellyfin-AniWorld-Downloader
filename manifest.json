@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.3.2.0",
+        "changelog": "v1.3.2.0\n- Feature: Improved download queue display (downloads tab)\n- Feature: Language indicator in title detail view\n- Feature: More user-friendly title detail view\n- Feature: Episodes refresh when navigating back to title\n- Fix: Same episode could be queued multiple times\n- Fix: Changing language by redownloading didn't work if language was used before\n- Fix: Missing downloaded info in title detail view\n- Fix: Download progress not reaching 100% in UI",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.3.2.0/jellyfin-aniworld-downloader-v1.3.2.0.zip",
+        "checksum": "a7dcc6715aeb6b7e4a8178c1d4ef65a8",
+        "timestamp": "2026-03-05T14:44:37Z"
+      },
+      {
         "version": "1.3.1.0",
         "changelog": "v1.3.1.0\n- Wider Jellyfin compatibility (10.9.0+, down from 10.11.0)\n- Jellyfin plugin repository support for easy install and updates\n- Automated release pipeline via GitHub Actions",
         "targetAbi": "10.9.0.0",
