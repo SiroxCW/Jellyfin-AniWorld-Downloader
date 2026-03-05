@@ -207,6 +207,31 @@ public class DownloadHistoryService : IDisposable
     }
 
     /// <summary>
+    /// Checks if an episode has any completed download record, regardless of language.
+    /// Used for the UI badge — shows whether the episode was ever downloaded.
+    /// </summary>
+    public bool HasCompletedDownload(string episodeUrl)
+    {
+        try
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText = @"
+                SELECT 1 FROM download_history
+                WHERE episode_url = @url AND status = 'Completed'
+                LIMIT 1
+            ";
+            cmd.Parameters.AddWithValue("@url", episodeUrl);
+
+            return cmd.ExecuteScalar() != null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Marks a completed download record as having its file deleted from disk.
     /// </summary>
     private void MarkRecordFileDeleted(string recordId)

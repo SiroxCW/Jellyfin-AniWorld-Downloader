@@ -179,7 +179,7 @@ public class AniWorldController : ControllerBase
         // Check if already downloaded (duplicate detection)
         if (!request.Force && _downloadService.IsAlreadyDownloaded(request.EpisodeUrl, language))
         {
-            return BadRequest("This episode has already been downloaded with this language. Set 'Force' to true to re-download.");
+            return BadRequest("This episode has already been downloaded in this language.");
         }
 
         var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl);
@@ -509,7 +509,7 @@ public class AniWorldController : ControllerBase
         }
 
         var lang = language ?? Plugin.Instance?.Configuration.PreferredLanguage ?? "1";
-        var downloaded = _downloadService.IsAlreadyDownloaded(url, lang);
+        var downloaded = _historyService.HasCompletedDownload(url);
         return Ok(new { downloaded, url, language = lang });
     }
 
