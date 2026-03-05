@@ -194,6 +194,11 @@ public class AniWorldController : ControllerBase
             seriesTitle,
             cancellationToken).ConfigureAwait(false);
 
+        if (taskId == null)
+        {
+            return BadRequest("This episode is already queued or downloading.");
+        }
+
         var task = _downloadService.GetDownload(taskId);
         return Ok(task);
     }
@@ -262,6 +267,8 @@ public class AniWorldController : ControllerBase
                 outputPath,
                 seriesTitle,
                 cancellationToken).ConfigureAwait(false);
+
+            if (taskId == null) continue;
 
             var task = _downloadService.GetDownload(taskId);
             if (task != null)
@@ -338,6 +345,8 @@ public class AniWorldController : ControllerBase
                     seriesTitle,
                     cancellationToken).ConfigureAwait(false);
 
+                if (taskId == null) { skippedCount++; continue; }
+
                 var task = _downloadService.GetDownload(taskId);
                 if (task != null)
                 {
@@ -369,6 +378,8 @@ public class AniWorldController : ControllerBase
                     outputPath,
                     seriesTitle,
                     cancellationToken).ConfigureAwait(false);
+
+                if (taskId == null) { skippedCount++; continue; }
 
                 var task = _downloadService.GetDownload(taskId);
                 if (task != null)

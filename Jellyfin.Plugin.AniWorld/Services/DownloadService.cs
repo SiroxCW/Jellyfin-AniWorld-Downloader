@@ -85,7 +85,7 @@ public class DownloadService
     /// <summary>
     /// Starts a download for an episode.
     /// </summary>
-    public Task<string> StartDownloadAsync(
+    public Task<string?> StartDownloadAsync(
         string episodeUrl,
         string languageKey,
         string provider,
@@ -93,6 +93,16 @@ public class DownloadService
         string seriesTitle,
         CancellationToken cancellationToken = default)
     {
+        // Prevent duplicate: reject if this episode is already queued or downloading
+        var existing = _activeTasks.Values.FirstOrDefault(t =>
+            t.EpisodeUrl == episodeUrl &&
+            t.Status is DownloadStatus.Queued or DownloadStatus.Resolving or DownloadStatus.Extracting
+                or DownloadStatus.Downloading or DownloadStatus.Retrying);
+        if (existing != null)
+        {
+            return Task.FromResult<string?>(null);
+        }
+
         var taskId = Guid.NewGuid().ToString("N")[..12];
 
         var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl);
