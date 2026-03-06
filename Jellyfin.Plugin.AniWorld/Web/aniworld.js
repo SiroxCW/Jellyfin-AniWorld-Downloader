@@ -558,7 +558,9 @@ export default function (view, params) {
         // ── Downloads ──
         downloadEpisode: function (encodedUrl) {
             var url = decodeURIComponent(encodedUrl);
-            this._startDownload(url, null, null);
+            var langSelect = view.querySelector('#aw-season-lang');
+            var lang = (langSelect && langSelect.value) ? langSelect.value : null;
+            this._startDownload(url, lang, null);
         },
 
         downloadWithOptions: function (encodedUrl, langKey, provider) {
