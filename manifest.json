@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.4.0.1",
+        "changelog": "v1.4.0.1\n- Change default AniWorld provider to Vidmoly (faster downloads) with VOE as fallback\n- Set default s.to provider to VOE\n- Improved README documentation",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.4.0.1/jellyfin-aniworld-downloader-v1.4.0.1.zip",
+        "checksum": "b795e1224e544c01a29328bf89d45afa",
+        "timestamp": "2026-03-06T18:39:47Z"
+      },
+      {
         "version": "1.4.0.0",
         "changelog": "v1.4.0.0\n- Feature: s.to series download support\n- Fix: Enable s.to downloader by default\n- Fix: Pass season language selection to single episode downloads\n- Fix: Prevent duplicate downloads when retrying a failed episode that was re-queued\n- Fix: Cleanup empty directories even when download file was never created\n- Fix: Cleanup base path for per-site configs, SQLite thread safety, and minor issues\n- Fix: Queue display order, cleanup, and race conditions",
         "targetAbi": "10.9.0.0",
