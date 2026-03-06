@@ -14,6 +14,7 @@ public class DownloadHistoryService : IDisposable
 {
     private readonly ILogger<DownloadHistoryService> _logger;
     private readonly SqliteConnection _db;
+    private readonly object _dbLock = new();
     private bool _disposed;
 
     /// <summary>
@@ -102,44 +103,47 @@ public class DownloadHistoryService : IDisposable
     /// </summary>
     public void SaveDownload(DownloadTask task, string seriesTitle, int season, int episode)
     {
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = @"
-                INSERT OR REPLACE INTO download_history
-                    (id, episode_url, series_title, episode_title, season, episode,
-                     provider, language, output_path, status, progress,
-                     file_size_bytes, error, retry_count, max_retries, started_at, completed_at, source)
-                VALUES
-                    (@id, @url, @series, @epTitle, @season, @episode,
-                     @provider, @language, @path, @status, @progress,
-                     @size, @error, @retry, @maxRetry, @started, @completed, @source)
-            ";
-            cmd.Parameters.AddWithValue("@id", task.Id);
-            cmd.Parameters.AddWithValue("@url", task.EpisodeUrl);
-            cmd.Parameters.AddWithValue("@series", seriesTitle);
-            cmd.Parameters.AddWithValue("@epTitle", task.EpisodeTitle ?? string.Empty);
-            cmd.Parameters.AddWithValue("@season", season);
-            cmd.Parameters.AddWithValue("@episode", episode);
-            cmd.Parameters.AddWithValue("@provider", task.Provider);
-            cmd.Parameters.AddWithValue("@language", task.Language);
-            cmd.Parameters.AddWithValue("@path", task.OutputPath);
-            cmd.Parameters.AddWithValue("@status", task.Status.ToString());
-            cmd.Parameters.AddWithValue("@progress", task.Progress);
-            cmd.Parameters.AddWithValue("@size", task.FileSizeBytes);
-            cmd.Parameters.AddWithValue("@error", (object?)task.Error ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@retry", task.RetryCount);
-            cmd.Parameters.AddWithValue("@maxRetry", task.MaxRetries);
-            cmd.Parameters.AddWithValue("@started", task.StartedAt.ToString("o"));
-            cmd.Parameters.AddWithValue("@completed", task.CompletedAt.HasValue
-                ? (object)task.CompletedAt.Value.ToString("o")
-                : DBNull.Value);
-            cmd.Parameters.AddWithValue("@source", task.Source ?? "aniworld");
-            cmd.ExecuteNonQuery();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to save download {Id} to history", task.Id);
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT OR REPLACE INTO download_history
+                        (id, episode_url, series_title, episode_title, season, episode,
+                         provider, language, output_path, status, progress,
+                         file_size_bytes, error, retry_count, max_retries, started_at, completed_at, source)
+                    VALUES
+                        (@id, @url, @series, @epTitle, @season, @episode,
+                         @provider, @language, @path, @status, @progress,
+                         @size, @error, @retry, @maxRetry, @started, @completed, @source)
+                ";
+                cmd.Parameters.AddWithValue("@id", task.Id);
+                cmd.Parameters.AddWithValue("@url", task.EpisodeUrl);
+                cmd.Parameters.AddWithValue("@series", seriesTitle);
+                cmd.Parameters.AddWithValue("@epTitle", task.EpisodeTitle ?? string.Empty);
+                cmd.Parameters.AddWithValue("@season", season);
+                cmd.Parameters.AddWithValue("@episode", episode);
+                cmd.Parameters.AddWithValue("@provider", task.Provider);
+                cmd.Parameters.AddWithValue("@language", task.Language);
+                cmd.Parameters.AddWithValue("@path", task.OutputPath);
+                cmd.Parameters.AddWithValue("@status", task.Status.ToString());
+                cmd.Parameters.AddWithValue("@progress", task.Progress);
+                cmd.Parameters.AddWithValue("@size", task.FileSizeBytes);
+                cmd.Parameters.AddWithValue("@error", (object?)task.Error ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@retry", task.RetryCount);
+                cmd.Parameters.AddWithValue("@maxRetry", task.MaxRetries);
+                cmd.Parameters.AddWithValue("@started", task.StartedAt.ToString("o"));
+                cmd.Parameters.AddWithValue("@completed", task.CompletedAt.HasValue
+                    ? (object)task.CompletedAt.Value.ToString("o")
+                    : DBNull.Value);
+                cmd.Parameters.AddWithValue("@source", task.Source ?? "aniworld");
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to save download {Id} to history", task.Id);
+            }
         }
     }
 
@@ -148,41 +152,44 @@ public class DownloadHistoryService : IDisposable
     /// </summary>
     public void UpdateDownload(DownloadTask task)
     {
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = @"
-                UPDATE download_history SET
-                    episode_title = @epTitle,
-                    provider = @provider,
-                    output_path = @path,
-                    status = @status,
-                    progress = @progress,
-                    file_size_bytes = @size,
-                    error = @error,
-                    retry_count = @retry,
-                    completed_at = @completed,
-                    source = @source
-                WHERE id = @id
-            ";
-            cmd.Parameters.AddWithValue("@id", task.Id);
-            cmd.Parameters.AddWithValue("@epTitle", task.EpisodeTitle ?? string.Empty);
-            cmd.Parameters.AddWithValue("@provider", task.Provider);
-            cmd.Parameters.AddWithValue("@path", task.OutputPath);
-            cmd.Parameters.AddWithValue("@status", task.Status.ToString());
-            cmd.Parameters.AddWithValue("@progress", task.Progress);
-            cmd.Parameters.AddWithValue("@size", task.FileSizeBytes);
-            cmd.Parameters.AddWithValue("@error", (object?)task.Error ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@retry", task.RetryCount);
-            cmd.Parameters.AddWithValue("@completed", task.CompletedAt.HasValue
-                ? (object)task.CompletedAt.Value.ToString("o")
-                : DBNull.Value);
-            cmd.Parameters.AddWithValue("@source", task.Source ?? "aniworld");
-            cmd.ExecuteNonQuery();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to update download {Id} in history", task.Id);
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE download_history SET
+                        episode_title = @epTitle,
+                        provider = @provider,
+                        output_path = @path,
+                        status = @status,
+                        progress = @progress,
+                        file_size_bytes = @size,
+                        error = @error,
+                        retry_count = @retry,
+                        completed_at = @completed,
+                        source = @source
+                    WHERE id = @id
+                ";
+                cmd.Parameters.AddWithValue("@id", task.Id);
+                cmd.Parameters.AddWithValue("@epTitle", task.EpisodeTitle ?? string.Empty);
+                cmd.Parameters.AddWithValue("@provider", task.Provider);
+                cmd.Parameters.AddWithValue("@path", task.OutputPath);
+                cmd.Parameters.AddWithValue("@status", task.Status.ToString());
+                cmd.Parameters.AddWithValue("@progress", task.Progress);
+                cmd.Parameters.AddWithValue("@size", task.FileSizeBytes);
+                cmd.Parameters.AddWithValue("@error", (object?)task.Error ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@retry", task.RetryCount);
+                cmd.Parameters.AddWithValue("@completed", task.CompletedAt.HasValue
+                    ? (object)task.CompletedAt.Value.ToString("o")
+                    : DBNull.Value);
+                cmd.Parameters.AddWithValue("@source", task.Source ?? "aniworld");
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update download {Id} in history", task.Id);
+            }
         }
     }
 
@@ -192,25 +199,28 @@ public class DownloadHistoryService : IDisposable
     /// </summary>
     public bool IsAlreadyDownloaded(string episodeUrl, string language)
     {
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = @"
-                SELECT language FROM download_history
-                WHERE episode_url = @url AND status = 'Completed'
-                ORDER BY completed_at DESC
-                LIMIT 1
-            ";
-            cmd.Parameters.AddWithValue("@url", episodeUrl);
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT language FROM download_history
+                    WHERE episode_url = @url AND status = 'Completed'
+                    ORDER BY completed_at DESC
+                    LIMIT 1
+                ";
+                cmd.Parameters.AddWithValue("@url", episodeUrl);
 
-            var result = cmd.ExecuteScalar();
-            return result is string lastLang &&
-                   lastLang.Equals(language, StringComparison.Ordinal);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
-            return false;
+                var result = cmd.ExecuteScalar();
+                return result is string lastLang &&
+                       lastLang.Equals(language, StringComparison.Ordinal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
+                return false;
+            }
         }
     }
 
@@ -220,24 +230,27 @@ public class DownloadHistoryService : IDisposable
     /// </summary>
     public string? GetCompletedLanguage(string episodeUrl)
     {
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = @"
-                SELECT language FROM download_history
-                WHERE episode_url = @url AND status = 'Completed'
-                ORDER BY completed_at DESC
-                LIMIT 1
-            ";
-            cmd.Parameters.AddWithValue("@url", episodeUrl);
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT language FROM download_history
+                    WHERE episode_url = @url AND status = 'Completed'
+                    ORDER BY completed_at DESC
+                    LIMIT 1
+                ";
+                cmd.Parameters.AddWithValue("@url", episodeUrl);
 
-            var result = cmd.ExecuteScalar();
-            return result as string;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
-            return null;
+                var result = cmd.ExecuteScalar();
+                return result as string;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
+                return null;
+            }
         }
     }
 
@@ -247,62 +260,65 @@ public class DownloadHistoryService : IDisposable
     public List<DownloadHistoryRecord> GetHistory(int limit = 50, int offset = 0, string? statusFilter = null, string? seriesFilter = null)
     {
         var records = new List<DownloadHistoryRecord>();
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            var where = "WHERE 1=1";
-            if (!string.IsNullOrEmpty(statusFilter))
+            try
             {
-                where += " AND status = @status";
-                cmd.Parameters.AddWithValue("@status", statusFilter);
-            }
-
-            if (!string.IsNullOrEmpty(seriesFilter))
-            {
-                where += " AND series_title LIKE @series";
-                cmd.Parameters.AddWithValue("@series", $"%{seriesFilter}%");
-            }
-
-            cmd.CommandText = $@"
-                SELECT id, episode_url, series_title, episode_title, season, episode,
-                       provider, language, output_path, status, progress,
-                       file_size_bytes, error, retry_count, started_at, completed_at, source
-                FROM download_history
-                {where}
-                ORDER BY started_at DESC
-                LIMIT @limit OFFSET @offset
-            ";
-            cmd.Parameters.AddWithValue("@limit", limit);
-            cmd.Parameters.AddWithValue("@offset", offset);
-
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                records.Add(new DownloadHistoryRecord
+                using var cmd = _db.CreateCommand();
+                var where = "WHERE 1=1";
+                if (!string.IsNullOrEmpty(statusFilter))
                 {
-                    Id = reader.GetString(0),
-                    EpisodeUrl = reader.GetString(1),
-                    SeriesTitle = reader.GetString(2),
-                    EpisodeTitle = reader.IsDBNull(3) ? null : reader.GetString(3),
-                    Season = reader.GetInt32(4),
-                    Episode = reader.GetInt32(5),
-                    Provider = reader.GetString(6),
-                    Language = reader.GetString(7),
-                    OutputPath = reader.GetString(8),
-                    Status = reader.GetString(9),
-                    Progress = reader.GetInt32(10),
-                    FileSizeBytes = reader.GetInt64(11),
-                    Error = reader.IsDBNull(12) ? null : reader.GetString(12),
-                    RetryCount = reader.GetInt32(13),
-                    StartedAt = reader.GetString(14),
-                    CompletedAt = reader.IsDBNull(15) ? null : reader.GetString(15),
-                    Source = reader.IsDBNull(16) ? "aniworld" : reader.GetString(16),
-                });
+                    where += " AND status = @status";
+                    cmd.Parameters.AddWithValue("@status", statusFilter);
+                }
+
+                if (!string.IsNullOrEmpty(seriesFilter))
+                {
+                    where += " AND series_title LIKE @series";
+                    cmd.Parameters.AddWithValue("@series", $"%{seriesFilter}%");
+                }
+
+                cmd.CommandText = $@"
+                    SELECT id, episode_url, series_title, episode_title, season, episode,
+                           provider, language, output_path, status, progress,
+                           file_size_bytes, error, retry_count, started_at, completed_at, source
+                    FROM download_history
+                    {where}
+                    ORDER BY started_at DESC
+                    LIMIT @limit OFFSET @offset
+                ";
+                cmd.Parameters.AddWithValue("@limit", limit);
+                cmd.Parameters.AddWithValue("@offset", offset);
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    records.Add(new DownloadHistoryRecord
+                    {
+                        Id = reader.GetString(0),
+                        EpisodeUrl = reader.GetString(1),
+                        SeriesTitle = reader.GetString(2),
+                        EpisodeTitle = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        Season = reader.GetInt32(4),
+                        Episode = reader.GetInt32(5),
+                        Provider = reader.GetString(6),
+                        Language = reader.GetString(7),
+                        OutputPath = reader.GetString(8),
+                        Status = reader.GetString(9),
+                        Progress = reader.GetInt32(10),
+                        FileSizeBytes = reader.GetInt64(11),
+                        Error = reader.IsDBNull(12) ? null : reader.GetString(12),
+                        RetryCount = reader.GetInt32(13),
+                        StartedAt = reader.GetString(14),
+                        CompletedAt = reader.IsDBNull(15) ? null : reader.GetString(15),
+                        Source = reader.IsDBNull(16) ? "aniworld" : reader.GetString(16),
+                    });
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get download history");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get download history");
+            }
         }
 
         return records;
@@ -314,33 +330,36 @@ public class DownloadHistoryService : IDisposable
     public DownloadStats GetStats()
     {
         var stats = new DownloadStats();
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = @"
-                SELECT
-                    COUNT(*) as total,
-                    COALESCE(SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END), 0) as completed,
-                    COALESCE(SUM(CASE WHEN status = 'Failed' THEN 1 ELSE 0 END), 0) as failed,
-                    COALESCE(SUM(CASE WHEN status = 'Cancelled' THEN 1 ELSE 0 END), 0) as cancelled,
-                    COALESCE(SUM(CASE WHEN status = 'Completed' THEN file_size_bytes ELSE 0 END), 0) as total_bytes,
-                    COUNT(DISTINCT series_title) as series_count
-                FROM download_history
-            ";
-            using var reader = cmd.ExecuteReader();
-            if (reader.Read())
+            try
             {
-                stats.TotalDownloads = reader.GetInt32(0);
-                stats.Completed = reader.GetInt32(1);
-                stats.Failed = reader.GetInt32(2);
-                stats.Cancelled = reader.GetInt32(3);
-                stats.TotalBytes = reader.GetInt64(4);
-                stats.UniqueSeriesCount = reader.GetInt32(5);
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT
+                        COUNT(*) as total,
+                        COALESCE(SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END), 0) as completed,
+                        COALESCE(SUM(CASE WHEN status = 'Failed' THEN 1 ELSE 0 END), 0) as failed,
+                        COALESCE(SUM(CASE WHEN status = 'Cancelled' THEN 1 ELSE 0 END), 0) as cancelled,
+                        COALESCE(SUM(CASE WHEN status = 'Completed' THEN file_size_bytes ELSE 0 END), 0) as total_bytes,
+                        COUNT(DISTINCT series_title) as series_count
+                    FROM download_history
+                ";
+                using var reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    stats.TotalDownloads = reader.GetInt32(0);
+                    stats.Completed = reader.GetInt32(1);
+                    stats.Failed = reader.GetInt32(2);
+                    stats.Cancelled = reader.GetInt32(3);
+                    stats.TotalBytes = reader.GetInt64(4);
+                    stats.UniqueSeriesCount = reader.GetInt32(5);
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get download stats");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get download stats");
+            }
         }
 
         return stats;
@@ -352,23 +371,26 @@ public class DownloadHistoryService : IDisposable
     public List<string> GetDownloadedSeries()
     {
         var series = new List<string>();
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = @"
-                SELECT DISTINCT series_title FROM download_history
-                WHERE series_title != '' AND status = 'Completed'
-                ORDER BY series_title
-            ";
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            try
             {
-                series.Add(reader.GetString(0));
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT DISTINCT series_title FROM download_history
+                    WHERE series_title != '' AND status = 'Completed'
+                    ORDER BY series_title
+                ";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    series.Add(reader.GetString(0));
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get downloaded series list");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get downloaded series list");
+            }
         }
 
         return series;
@@ -379,26 +401,29 @@ public class DownloadHistoryService : IDisposable
     /// </summary>
     public int MarkInterruptedDownloads()
     {
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = @"
-                UPDATE download_history
-                SET status = 'Failed', error = 'Interrupted by server restart'
-                WHERE status IN ('Queued', 'Resolving', 'Extracting', 'Downloading', 'Retrying')
-            ";
-            var count = cmd.ExecuteNonQuery();
-            if (count > 0)
+            try
             {
-                _logger.LogWarning("Marked {Count} interrupted download(s) as failed", count);
-            }
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE download_history
+                    SET status = 'Failed', error = 'Interrupted by server restart'
+                    WHERE status IN ('Queued', 'Resolving', 'Extracting', 'Downloading', 'Retrying')
+                ";
+                var count = cmd.ExecuteNonQuery();
+                if (count > 0)
+                {
+                    _logger.LogWarning("Marked {Count} interrupted download(s) as failed", count);
+                }
 
-            return count;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to mark interrupted downloads");
-            return 0;
+                return count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to mark interrupted downloads");
+                return 0;
+            }
         }
     }
 
@@ -407,17 +432,20 @@ public class DownloadHistoryService : IDisposable
     /// </summary>
     public bool DeleteRecord(string id)
     {
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = "DELETE FROM download_history WHERE id = @id";
-            cmd.Parameters.AddWithValue("@id", id);
-            return cmd.ExecuteNonQuery() > 0;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to delete history record {Id}", id);
-            return false;
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = "DELETE FROM download_history WHERE id = @id";
+                cmd.Parameters.AddWithValue("@id", id);
+                return cmd.ExecuteNonQuery() > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete history record {Id}", id);
+                return false;
+            }
         }
     }
 
@@ -426,21 +454,24 @@ public class DownloadHistoryService : IDisposable
     /// </summary>
     public int CleanupOld(int daysOld = 90)
     {
-        try
+        lock (_dbLock)
         {
-            using var cmd = _db.CreateCommand();
-            cmd.CommandText = @"
-                DELETE FROM download_history
-                WHERE started_at < datetime('now', @days || ' days')
-                  AND status IN ('Completed', 'Failed', 'Cancelled')
-            ";
-            cmd.Parameters.AddWithValue("@days", $"-{daysOld}");
-            return cmd.ExecuteNonQuery();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to cleanup old history");
-            return 0;
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    DELETE FROM download_history
+                    WHERE started_at < datetime('now', @days || ' days')
+                      AND status IN ('Completed', 'Failed', 'Cancelled')
+                ";
+                cmd.Parameters.AddWithValue("@days", $"-{daysOld}");
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to cleanup old history");
+                return 0;
+            }
         }
     }
 

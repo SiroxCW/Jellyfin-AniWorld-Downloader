@@ -191,25 +191,7 @@ public class DownloadService
             task.Status = DownloadStatus.Cancelled;
             _historyService.UpdateDownload(task);
 
-            CleanupFileOnCancel(task.OutputPath);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Removes a completed/failed/cancelled download from the active list.
-    /// </summary>
-    public bool RemoveDownload(string taskId)
-    {
-        if (_activeTasks.TryRemove(taskId, out var task))
-        {
-            if (task.Status == DownloadStatus.Downloading)
-            {
-                task.CancellationSource?.Cancel();
-            }
+            CleanupFileOnCancel(task.OutputPath, task.Source);
 
             return true;
         }
@@ -248,6 +230,7 @@ public class DownloadService
             task.RetryCount = 0;
             task.Progress = 0;
             task.SequenceNumber = Interlocked.Increment(ref _sequenceCounter);
+            task.CancellationSource?.Dispose();
             task.CancellationSource = new CancellationTokenSource();
 
             _historyService.UpdateDownload(task);
@@ -292,7 +275,7 @@ public class DownloadService
                 task.Error = $"Falling back to {fallbackProvider}...";
                 _historyService.UpdateDownload(task);
 
-                CleanupFileOnCancel(task.OutputPath);
+                CleanupFileOnCancel(task.OutputPath, task.Source);
 
                 if (await TryDownloadWithRetriesAsync(task, token).ConfigureAwait(false))
                 {
@@ -305,7 +288,7 @@ public class DownloadService
 
             if (task.Status == DownloadStatus.Failed)
             {
-                CleanupPartialFile(task.OutputPath);
+                CleanupPartialFile(task.OutputPath, task.Source);
             }
         }
     }
@@ -324,7 +307,7 @@ public class DownloadService
             {
                 task.Status = DownloadStatus.Cancelled;
                 _historyService.UpdateDownload(task);
-                CleanupFileOnCancel(task.OutputPath);
+                CleanupFileOnCancel(task.OutputPath, task.Source);
                 return true;
             }
 
@@ -346,7 +329,7 @@ public class DownloadService
                 {
                     task.Status = DownloadStatus.Cancelled;
                     _historyService.UpdateDownload(task);
-                    CleanupFileOnCancel(task.OutputPath);
+                    CleanupFileOnCancel(task.OutputPath, task.Source);
                     return true;
                 }
 
@@ -368,7 +351,7 @@ public class DownloadService
                 if (task.Status == DownloadStatus.Cancelled)
                 {
                     _historyService.UpdateDownload(task);
-                    CleanupFileOnCancel(task.OutputPath);
+                    CleanupFileOnCancel(task.OutputPath, task.Source);
                     return true;
                 }
             }
@@ -376,7 +359,7 @@ public class DownloadService
             {
                 task.Status = DownloadStatus.Cancelled;
                 _historyService.UpdateDownload(task);
-                CleanupFileOnCancel(task.OutputPath);
+                CleanupFileOnCancel(task.OutputPath, task.Source);
                 return true;
             }
             catch (Exception ex)
@@ -578,7 +561,7 @@ public class DownloadService
     /// <summary>
     /// Cleans up a failed download file and its empty parent directories.
     /// </summary>
-    private void CleanupPartialFile(string filePath)
+    private void CleanupPartialFile(string filePath, string source)
     {
         try
         {
@@ -590,7 +573,7 @@ public class DownloadService
             var size = new FileInfo(filePath).Length;
             File.Delete(filePath);
             _logger.LogInformation("Cleaned up failed download file: {Path} ({Size} bytes)", filePath, size);
-            CleanupEmptyParentDirectories(filePath);
+            CleanupEmptyParentDirectories(filePath, source);
         }
         catch (Exception ex)
         {
@@ -602,7 +585,7 @@ public class DownloadService
     /// Cleans up a file on cancellation — removes regardless of size since
     /// a cancelled download is always incomplete/unwanted.
     /// </summary>
-    private void CleanupFileOnCancel(string filePath)
+    private void CleanupFileOnCancel(string filePath, string source)
     {
         try
         {
@@ -615,7 +598,7 @@ public class DownloadService
             File.Delete(filePath);
             _logger.LogInformation("Cleaned up cancelled download file: {Path} ({Size} bytes)", filePath, size);
 
-            CleanupEmptyParentDirectories(filePath);
+            CleanupEmptyParentDirectories(filePath, source);
         }
         catch (Exception ex)
         {
@@ -626,9 +609,9 @@ public class DownloadService
     /// <summary>
     /// Removes empty parent directories up to (but not including) the configured download base path.
     /// </summary>
-    private void CleanupEmptyParentDirectories(string filePath)
+    private void CleanupEmptyParentDirectories(string filePath, string source)
     {
-        var basePath = Plugin.Instance?.Configuration.DownloadPath ?? string.Empty;
+        var basePath = Plugin.Instance?.Configuration.GetDownloadPath(source) ?? string.Empty;
         if (string.IsNullOrEmpty(basePath))
         {
             return;
