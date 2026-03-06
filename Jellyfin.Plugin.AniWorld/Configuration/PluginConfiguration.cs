@@ -33,6 +33,8 @@ public class PluginConfiguration : BasePluginConfiguration
     public SiteDownloaderConfig AniWorldConfig { get; set; } = new()
     {
         Enabled = true,
+        PreferredProvider = "Vidmoly",
+        FallbackProvider = "VOE",
     };
 
     /// <summary>
@@ -41,6 +43,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public SiteDownloaderConfig StoConfig { get; set; } = new()
     {
         Enabled = true,
+        PreferredProvider = "VOE",
     };
 
     // ── Legacy flat properties (backward compat / used as AniWorld defaults) ──
