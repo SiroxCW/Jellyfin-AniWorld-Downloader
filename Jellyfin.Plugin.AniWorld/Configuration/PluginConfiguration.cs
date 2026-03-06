@@ -40,7 +40,7 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public SiteDownloaderConfig StoConfig { get; set; } = new()
     {
-        Enabled = false,
+        Enabled = true,
     };
 
     // ── Legacy flat properties (backward compat / used as AniWorld defaults) ──
