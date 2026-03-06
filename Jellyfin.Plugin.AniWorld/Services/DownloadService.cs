@@ -36,6 +36,7 @@ public class DownloadService
     private readonly ConcurrentDictionary<string, DownloadTask> _activeTasks = new();
     private readonly Channel<DownloadTask> _downloadQueue = Channel.CreateUnbounded<DownloadTask>(
         new UnboundedChannelOptions { SingleReader = false });
+    private readonly object _queueLock = new();
     private long _sequenceCounter;
 
     /// <summary>
@@ -132,48 +133,51 @@ public class DownloadService
         string source = "aniworld",
         CancellationToken cancellationToken = default)
     {
-        // Prevent duplicate: reject if this episode is already queued or downloading
-        var existing = _activeTasks.Values.FirstOrDefault(t =>
-            t.EpisodeUrl == episodeUrl &&
-            t.Status is DownloadStatus.Queued or DownloadStatus.Resolving or DownloadStatus.Extracting
-                or DownloadStatus.Downloading or DownloadStatus.Retrying);
-        if (existing != null)
+        DownloadTask task;
+
+        // Lock the check-and-insert to prevent duplicate queuing from concurrent requests
+        lock (_queueLock)
         {
-            return null;
+            var existing = _activeTasks.Values.FirstOrDefault(t =>
+                t.EpisodeUrl == episodeUrl &&
+                t.Status is DownloadStatus.Queued or DownloadStatus.Resolving or DownloadStatus.Extracting
+                    or DownloadStatus.Downloading or DownloadStatus.Retrying);
+            if (existing != null)
+            {
+                return null;
+            }
+
+            var taskId = Guid.NewGuid().ToString("N")[..12];
+            var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl);
+
+            task = new DownloadTask
+            {
+                Id = taskId,
+                EpisodeUrl = episodeUrl,
+                Provider = provider,
+                Language = languageKey,
+                OutputPath = outputPath,
+                SeriesTitle = seriesTitle,
+                Season = season,
+                Episode = episode,
+                Source = source,
+                Status = DownloadStatus.Queued,
+                StartedAt = DateTime.UtcNow,
+                SequenceNumber = Interlocked.Increment(ref _sequenceCounter),
+                MaxRetries = Plugin.Instance?.Configuration.MaxRetries ?? DefaultMaxRetries,
+            };
+
+            task.CancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _activeTasks[taskId] = task;
         }
 
-        var taskId = Guid.NewGuid().ToString("N")[..12];
-
-        var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl);
-
-        var task = new DownloadTask
-        {
-            Id = taskId,
-            EpisodeUrl = episodeUrl,
-            Provider = provider,
-            Language = languageKey,
-            OutputPath = outputPath,
-            SeriesTitle = seriesTitle,
-            Season = season,
-            Episode = episode,
-            Source = source,
-            Status = DownloadStatus.Queued,
-            StartedAt = DateTime.UtcNow,
-            SequenceNumber = Interlocked.Increment(ref _sequenceCounter),
-            MaxRetries = Plugin.Instance?.Configuration.MaxRetries ?? DefaultMaxRetries,
-        };
-
-        task.CancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-        _activeTasks[taskId] = task;
-
         // Persist initial state to SQLite
-        _historyService.SaveDownload(task, seriesTitle, season, episode);
+        _historyService.SaveDownload(task, task.SeriesTitle, task.Season, task.Episode);
 
         // Enqueue for FIFO processing by worker tasks
         await _downloadQueue.Writer.WriteAsync(task, cancellationToken).ConfigureAwait(false);
 
-        return taskId;
+        return task.Id;
     }
 
     /// <summary>
@@ -243,6 +247,7 @@ public class DownloadService
             task.Error = null;
             task.RetryCount = 0;
             task.Progress = 0;
+            task.SequenceNumber = Interlocked.Increment(ref _sequenceCounter);
             task.CancellationSource = new CancellationTokenSource();
 
             _historyService.UpdateDownload(task);
@@ -397,6 +402,8 @@ public class DownloadService
 
     private async Task ExecuteDownloadAsync(DownloadTask task, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
+
         task.Status = DownloadStatus.Resolving;
         _historyService.UpdateDownload(task);
 
@@ -443,6 +450,8 @@ public class DownloadService
             throw new InvalidOperationException($"No extractor available for provider: {task.Provider}");
         }
 
+        token.ThrowIfCancellationRequested();
+
         task.Status = DownloadStatus.Extracting;
         _historyService.UpdateDownload(task);
         var streamUrl = await extractor.GetDirectLinkAsync(embedUrl, token).ConfigureAwait(false);
@@ -460,6 +469,8 @@ public class DownloadService
         }
 
         _logger.LogInformation("Stream URL: {StreamUrl}", streamUrl);
+
+        token.ThrowIfCancellationRequested();
 
         // 5. Download with ffmpeg
         task.Status = DownloadStatus.Downloading;
@@ -565,22 +576,21 @@ public class DownloadService
     }
 
     /// <summary>
-    /// Cleans up a partial/failed download file (only removes very small stubs).
+    /// Cleans up a failed download file and its empty parent directories.
     /// </summary>
     private void CleanupPartialFile(string filePath)
     {
         try
         {
-            if (File.Exists(filePath))
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
-                var fileInfo = new FileInfo(filePath);
-                if (fileInfo.Length < 1024)
-                {
-                    File.Delete(filePath);
-                    _logger.LogDebug("Cleaned up partial file: {Path}", filePath);
-                    CleanupEmptyParentDirectories(filePath);
-                }
+                return;
             }
+
+            var size = new FileInfo(filePath).Length;
+            File.Delete(filePath);
+            _logger.LogInformation("Cleaned up failed download file: {Path} ({Size} bytes)", filePath, size);
+            CleanupEmptyParentDirectories(filePath);
         }
         catch (Exception ex)
         {

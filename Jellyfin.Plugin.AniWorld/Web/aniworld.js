@@ -703,15 +703,16 @@ export default function (view, params) {
                 return;
             }
 
-            var statusOrder = { Downloading: 0, Extracting: 1, Resolving: 1, Retrying: 2, Queued: 3, Completed: 4, Failed: 4, Cancelled: 4 };
+            var statusOrder = { Downloading: 0, Retrying: 0, Extracting: 0, Resolving: 0, Queued: 1, Completed: 2, Failed: 2, Cancelled: 2 };
             downloads.sort(function (a, b) {
                 var sa = statusOrder[a.Status] !== undefined ? statusOrder[a.Status] : 9;
                 var sb = statusOrder[b.Status] !== undefined ? statusOrder[b.Status] : 9;
                 if (sa !== sb) return sa - sb;
-                if (sa === 4) {
+                if (sa === 2) {
+                    // Done group: newest first
                     return (b.StartedAt || '').localeCompare(a.StartedAt || '');
                 }
-                // For active/queued items, preserve backend insertion order
+                // Active (0) and Queued (1): preserve backend insertion order (next-up first)
                 return 0;
             });
 

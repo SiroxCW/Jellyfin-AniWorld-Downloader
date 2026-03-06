@@ -336,11 +336,6 @@ public class AniWorldController : ControllerBase
         {
             var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
 
-            if (System.IO.File.Exists(outputPath))
-            {
-                continue;
-            }
-
             if (_downloadService.IsAlreadyDownloaded(ep.Url, language))
             {
                 continue;
@@ -419,7 +414,7 @@ public class AniWorldController : ControllerBase
             {
                 var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
 
-                if (System.IO.File.Exists(outputPath) || _downloadService.IsAlreadyDownloaded(ep.Url, language))
+                if (_downloadService.IsAlreadyDownloaded(ep.Url, language))
                 {
                     skippedCount++;
                     continue;
@@ -454,7 +449,7 @@ public class AniWorldController : ControllerBase
             {
                 var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
 
-                if (System.IO.File.Exists(outputPath) || _downloadService.IsAlreadyDownloaded(ep.Url, language))
+                if (_downloadService.IsAlreadyDownloaded(ep.Url, language))
                 {
                     skippedCount++;
                     continue;
