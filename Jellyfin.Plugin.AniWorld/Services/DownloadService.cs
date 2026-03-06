@@ -225,6 +225,17 @@ public class DownloadService
         if (_activeTasks.TryGetValue(taskId, out var task) &&
             task.Status is DownloadStatus.Failed)
         {
+            // Check if another task for the same episode is already active
+            var duplicate = _activeTasks.Values.FirstOrDefault(t =>
+                t.Id != taskId &&
+                t.EpisodeUrl == task.EpisodeUrl &&
+                t.Status is DownloadStatus.Queued or DownloadStatus.Resolving or DownloadStatus.Extracting
+                    or DownloadStatus.Downloading or DownloadStatus.Retrying);
+            if (duplicate != null)
+            {
+                return false;
+            }
+
             task.Status = DownloadStatus.Queued;
             task.Error = null;
             task.RetryCount = 0;
