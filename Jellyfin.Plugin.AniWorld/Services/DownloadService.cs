@@ -565,15 +565,17 @@ public class DownloadService
     {
         try
         {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
-                return;
+                var size = new FileInfo(filePath).Length;
+                File.Delete(filePath);
+                _logger.LogInformation("Cleaned up failed download file: {Path} ({Size} bytes)", filePath, size);
             }
 
-            var size = new FileInfo(filePath).Length;
-            File.Delete(filePath);
-            _logger.LogInformation("Cleaned up failed download file: {Path} ({Size} bytes)", filePath, size);
-            CleanupEmptyParentDirectories(filePath, source);
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                CleanupEmptyParentDirectories(filePath, source);
+            }
         }
         catch (Exception ex)
         {
@@ -589,16 +591,17 @@ public class DownloadService
     {
         try
         {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
-                return;
+                var size = new FileInfo(filePath).Length;
+                File.Delete(filePath);
+                _logger.LogInformation("Cleaned up cancelled download file: {Path} ({Size} bytes)", filePath, size);
             }
 
-            var size = new FileInfo(filePath).Length;
-            File.Delete(filePath);
-            _logger.LogInformation("Cleaned up cancelled download file: {Path} ({Size} bytes)", filePath, size);
-
-            CleanupEmptyParentDirectories(filePath, source);
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                CleanupEmptyParentDirectories(filePath, source);
+            }
         }
         catch (Exception ex)
         {
