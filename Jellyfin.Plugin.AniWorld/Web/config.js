@@ -17,6 +17,12 @@ export default function (view, params) {
             view.querySelector('#selAniWorldProvider').value = aw.PreferredProvider || config.PreferredProvider || 'VOE';
             view.querySelector('#selAniWorldFallback').value = aw.FallbackProvider || config.FallbackProvider || '';
 
+            // HiAnime
+            var hi = config.HiAnimeConfig || {};
+            view.querySelector('#chkHiAnimeEnabled').checked = hi.Enabled !== false;
+            view.querySelector('#txtHiAnimeDownloadPath').value = hi.DownloadPath || '';
+            view.querySelector('#selHiAnimeLanguage').value = hi.PreferredLanguage || 'sub';
+
             // s.to
             var sto = config.StoConfig || {};
             view.querySelector('#chkStoEnabled').checked = sto.Enabled === true;
@@ -50,6 +56,12 @@ export default function (view, params) {
             config.PreferredLanguage = config.AniWorldConfig.PreferredLanguage;
             config.PreferredProvider = config.AniWorldConfig.PreferredProvider;
             config.FallbackProvider = config.AniWorldConfig.FallbackProvider;
+
+            // HiAnime
+            if (!config.HiAnimeConfig) config.HiAnimeConfig = {};
+            config.HiAnimeConfig.Enabled = view.querySelector('#chkHiAnimeEnabled').checked;
+            config.HiAnimeConfig.DownloadPath = view.querySelector('#txtHiAnimeDownloadPath').value.trim();
+            config.HiAnimeConfig.PreferredLanguage = view.querySelector('#selHiAnimeLanguage').value;
 
             // s.to
             if (!config.StoConfig) config.StoConfig = {};

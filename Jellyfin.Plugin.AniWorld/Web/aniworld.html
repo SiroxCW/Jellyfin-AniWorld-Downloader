@@ -39,11 +39,12 @@
 
         /* Source logo (inline in titles) */
         .aw-source-logo { height: 1.2em; vertical-align: middle; }
+        .aw-source-logo-wide { height: 0.9em; max-width: 4em; object-fit: contain; vertical-align: middle; }
 
         /* Series detail */
         .aw-series { display: flex; gap: 2em; margin-bottom: 1.5em; }
         .aw-cover { width: 220px; border-radius: 10px; flex-shrink: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
-        .aw-meta h2 { margin: 0 0 0.5em; font-size: 1.5em; }
+        .aw-meta h2 { margin: 0 0 0.5em; font-size: 1.5em; display: flex; align-items: center; gap: 0.4em; }
         .aw-meta p { opacity: 0.7; line-height: 1.6; margin: 0.5em 0; }
         .aw-genres { display: flex; gap: 0.4em; flex-wrap: wrap; margin: 0.8em 0; }
         .aw-genre { background: rgba(0,164,220,0.2); border: 1px solid rgba(0,164,220,0.3); padding: 0.2em 0.6em; border-radius: 12px; font-size: 0.78em; }
@@ -81,7 +82,7 @@
         .aw-dl { display: flex; flex-direction: column; gap: 0.5em; }
         .aw-dl-item { display: flex; align-items: center; gap: 1em; padding: 1em; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; }
         .aw-dl-info { flex: 1; min-width: 0; }
-        .aw-dl-info strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .aw-dl-info strong { display: flex; align-items: center; gap: 0.3em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .aw-dl-info small { opacity: 0.5; }
         .aw-dl-progress { width: 120px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
         .aw-dl-bar { height: 100%; background: #00a4dc; transition: width 0.4s ease; border-radius: 3px; }
@@ -114,7 +115,7 @@
         .aw-history { display: flex; flex-direction: column; gap: 0.4em; }
         .aw-hist-item { display: flex; align-items: center; gap: 1em; padding: 0.8em 1em; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; }
         .aw-hist-info { flex: 1; min-width: 0; }
-        .aw-hist-info strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.95em; }
+        .aw-hist-info strong { display: flex; align-items: center; gap: 0.3em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.95em; }
         .aw-hist-info small { opacity: 0.5; font-size: 0.8em; }
         .aw-hist-meta { display: flex; gap: 0.8em; align-items: center; flex-shrink: 0; }
         .aw-hist-meta .aw-hist-size { opacity: 0.5; font-size: 0.82em; min-width: 5em; text-align: right; }
@@ -141,6 +142,8 @@
         .aw-browse-info small { display: block; margin-top: 0.3em; opacity: 0.5; font-size: 0.75em; }
         .aw-browse-source-badge { position: absolute; top: 0.4em; right: 0.4em; height: 1.4em; border-radius: 4px; padding: 0.15em 0.3em; }
         .aw-browse-source-badge.aw-badge-aniworld { background: rgba(0,0,0,0.5); border-radius: 999px; }
+        .aw-badge-hianime { background: rgba(0,0,0,0.5); border-radius: 999px; display: flex; align-items: center; justify-content: center; }
+        .aw-badge-hianime img { height: 0.8em; }
 
         /* Browse section heading */
         .aw-browse-section-title { font-size: 1.1em; font-weight: 600; margin: 1.2em 0 0.8em; }

@@ -3,7 +3,7 @@
 ![GitHub Release](https://img.shields.io/github/v/release/SiroxCW/Jellyfin-AniWorld-Downloader)
 ![GitHub License](https://img.shields.io/github/license/SiroxCW/Jellyfin-AniWorld-Downloader)
 
-A Jellyfin plugin for searching and downloading anime and series from [aniworld.to](https://aniworld.to) and [s.to](https://s.to), directly inside Jellyfin's web interface.
+A Jellyfin plugin for searching and downloading anime and series from [aniworld.to](https://aniworld.to), [s.to](https://s.to), and [hianime.to](https://hianime.to), directly inside Jellyfin's web interface.
 
 Series View| Search View
 :---:|:---:
@@ -13,9 +13,9 @@ Series View| Search View
 
 - **Search and browse** anime and series with cover art, popular titles, and new releases
 - **Download** individual episodes, full seasons, or entire series
-- **Two sites supported**: aniworld.to (anime) and s.to (series), each with independent settings
-- **Multiple languages**: German Dub, English Sub, German Sub
-- **Multiple providers**: VOE, Filemoon, Vidoza and Vidmoly with automatic fallback
+- **Three sites supported**: aniworld.to (anime), s.to (series), and hianime.to (English sub/dub)
+- **Multiple languages**: German Dub, German Sub, English Sub (aniworld), German Dub, English Dub (s.to), English Sub, English Dub (hianime)
+- **Multiple providers**: VOE, Filemoon, Vidoza and Vidmoly (aniworld/s.to), MegaCloud auto-extraction (hianime)
 - **Download manager** with real-time progress, cancel, retry, and batch operations
 - **Automatic retries** with exponential backoff and provider fallback
 - **Auto library scan** so new episodes appear in Jellyfin immediately
@@ -86,7 +86,7 @@ After installing, go to **Dashboard > Plugins > AniWorld Downloader** to configu
 | Max Retry Attempts | How many times to retry a failed download before giving up (default: 3) |
 | Auto-scan Library | Trigger a Jellyfin library scan when a download finishes |
 
-### Per-site settings (aniworld.to / s.to)
+### Per-site settings (aniworld.to / s.to / hianime.to)
 
 Each site can be enabled or disabled independently and has its own settings. If a per-site setting is left empty, the global default is used.
 
@@ -95,8 +95,10 @@ Each site can be enabled or disabled independently and has its own settings. If 
 | Enabled | Toggle this site on or off |
 | Download Path | Where to save files (should point to a Jellyfin library folder) |
 | Preferred Language | Default language for downloads |
-| Preferred Provider | Default streaming provider |
-| Fallback Provider | Backup provider if the primary one fails after all retries |
+| Preferred Provider | Default streaming provider (aniworld/s.to only) |
+| Fallback Provider | Backup provider if the primary one fails after all retries (aniworld/s.to only) |
+
+> **Note:** HiAnime is best used for English dub or when aniworld.to does not have the anime you are looking for. HiAnime does not have seasons, so each entry maps to a single season. Search for the specific season you want. HiAnime's download path defaults to the AniWorld download path if left empty.
 
 ## Usage
 
@@ -109,20 +111,32 @@ Each site can be enabled or disabled independently and has its own settings. If 
 
 ## How It Works
 
+### aniworld.to / s.to
+
 1. Searches use each site's AJAX search endpoint
 2. Series, season, and episode pages are scraped to find provider links
 3. Provider redirect URLs are resolved to embed pages
 4. Each provider has a dedicated extractor that pulls out the direct stream URL
 5. ffmpeg downloads the stream and saves it as MKV
 
+### hianime.to
+
+1. Searches use hianime's search page
+2. Episode lists are fetched via hianime's AJAX API
+3. Server list is retrieved per episode (HD-2 and HD-3, HD-1 is skipped due to Cloudflare)
+4. MegaCloud embed page is visited to extract an auth token
+5. Token is used to fetch HLS stream URLs from MegaCloud's getSources API
+6. ffmpeg downloads the HLS stream with the required Referer header
+
 ### Supported providers
 
-| Provider | Method |
-|----------|--------|
-| **VOE** | Decodes obfuscated JSON (ROT13, base64, char shift) to extract HLS URLs |
-| **Filemoon** | Handles both modern Byse API (AES-256-GCM) and legacy packed JS |
-| **Vidmoly** | Extracts HLS URLs from JavaScript sources |
-| **Vidoza** | Extracts MP4 URLs from source tags |
+| Provider | Site | Method |
+|----------|------|--------|
+| **VOE** | aniworld/s.to | Decodes obfuscated JSON (ROT13, base64, char shift) to extract HLS URLs |
+| **Filemoon** | aniworld/s.to | Handles both modern Byse API (AES-256-GCM) and legacy packed JS |
+| **Vidmoly** | aniworld/s.to | Extracts HLS URLs from JavaScript sources |
+| **Vidoza** | aniworld/s.to | Extracts MP4 URLs from source tags |
+| **MegaCloud** | hianime | Extracts auth token from embed page, fetches HLS URLs via getSources API |
 
 ## License
 

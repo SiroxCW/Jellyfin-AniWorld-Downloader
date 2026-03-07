@@ -104,6 +104,38 @@
                         </div>
                     </div>
 
+                    <!-- HiAnime Settings -->
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">HiAnime Downloader (hianime.to)</h3>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkHiAnimeEnabled" />
+                                <span>Enable HiAnime Downloader</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Enable searching and downloading anime from hianime.to (English sub/dub).
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtHiAnimeDownloadPath">Download Path</label>
+                            <input is="emby-input" type="text" id="txtHiAnimeDownloadPath" placeholder="/media/anime" />
+                            <div class="fieldDescription">
+                                Base directory for downloaded anime files. Leave empty to use the AniWorld download path.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selHiAnimeLanguage">Preferred Language</label>
+                            <select is="emby-select" id="selHiAnimeLanguage">
+                                <option value="sub">English Sub</option>
+                                <option value="dub">English Dub</option>
+                            </select>
+                            <div class="fieldDescription">Default language for HiAnime downloads.</div>
+                        </div>
+                    </div>
+
                     <!-- s.to Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">s.to Downloader (SerienStream)</h3>

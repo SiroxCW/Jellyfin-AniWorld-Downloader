@@ -39,7 +39,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public override string Name => "AniWorld Downloader";
 
     /// <inheritdoc />
-    public override string Description => "Search and download anime from aniworld.to and series from s.to directly within Jellyfin.";
+    public override string Description => "Search and download anime from aniworld.to and hianime.to, and series from s.to directly within Jellyfin.";
 
     /// <inheritdoc />
     public override Guid Id => Guid.Parse(PluginGuid);

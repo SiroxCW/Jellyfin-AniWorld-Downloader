@@ -16,8 +16,10 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     {
         serviceCollection.AddHttpClient("AniWorld");
         serviceCollection.AddHttpClient("STO");
+        serviceCollection.AddHttpClient("HiAnime");
         serviceCollection.AddSingleton<AniWorldService>();
         serviceCollection.AddSingleton<StoService>();
+        serviceCollection.AddSingleton<HiAnimeService>();
         serviceCollection.AddSingleton<DownloadHistoryService>();
         serviceCollection.AddSingleton<DownloadService>();
         serviceCollection.AddSingleton<IStreamExtractor, VoeExtractor>();

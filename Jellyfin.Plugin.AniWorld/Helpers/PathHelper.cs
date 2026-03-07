@@ -27,11 +27,18 @@ public static class PathHelper
 
     /// <summary>
     /// Regex to extract the series slug from a URL.
-    /// Supports both /anime/stream/{slug} (aniworld) and /serie/{slug} (s.to).
+    /// Supports /anime/stream/{slug} (aniworld), /serie/{slug} (s.to), and /watch/{slug} (hianime).
     /// </summary>
     public static readonly Regex SeriesSlugFromUrl = new(
-        @"/(?:anime/stream|serie)/(?<slug>[^/]+)",
+        @"/(?:anime/stream|serie|watch)/(?<slug>[^/?\#]+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Regex to extract episode number from a HiAnime URL (?ep=N).
+    /// </summary>
+    public static readonly Regex HiAnimeEpisodeFromUrl = new(
+        @"[?&]ep=(?<episode>\d+)",
+        RegexOptions.Compiled);
 
     /// <summary>
     /// Sanitizes a file/folder name by removing invalid and problematic characters.
@@ -68,9 +75,22 @@ public static class PathHelper
     /// <summary>
     /// Parses season and episode numbers from an episode URL.
     /// Returns (0, N) for movies and (0, 0) for unrecognised URLs.
+    /// HiAnime URLs always return Season 1 with episode from ?ep=N.
     /// </summary>
     public static (int Season, int Episode) ParseSeasonEpisode(string url)
     {
+        // HiAnime: /watch/{slug}?ep=N → Season 1, Episode N
+        if (url.Contains("hianime.to", StringComparison.OrdinalIgnoreCase))
+        {
+            var hiMatch = HiAnimeEpisodeFromUrl.Match(url);
+            if (hiMatch.Success)
+            {
+                return (1, int.Parse(hiMatch.Groups["episode"].Value));
+            }
+
+            return (1, 0);
+        }
+
         var seMatch = SeasonEpisodeFromUrl.Match(url);
         if (seMatch.Success)
         {
@@ -93,6 +113,15 @@ public static class PathHelper
     public static string BuildOutputPath(string basePath, string seriesTitle, string episodeUrl)
     {
         var safeName = SanitizeFileName(seriesTitle);
+
+        // HiAnime: always Season 01, episode from ?ep=N
+        if (episodeUrl.Contains("hianime.to", StringComparison.OrdinalIgnoreCase))
+        {
+            var hiMatch = HiAnimeEpisodeFromUrl.Match(episodeUrl);
+            var epNum = hiMatch.Success ? int.Parse(hiMatch.Groups["episode"].Value) : 1;
+            var fileName = $"{safeName} - S01E{epNum:D2}.mkv";
+            return Path.Combine(basePath, safeName, "Season 01", fileName);
+        }
 
         var seMatch = SeasonEpisodeFromUrl.Match(episodeUrl);
         if (seMatch.Success)

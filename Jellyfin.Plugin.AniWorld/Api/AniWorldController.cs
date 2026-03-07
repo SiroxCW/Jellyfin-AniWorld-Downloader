@@ -28,6 +28,7 @@ public class AniWorldController : ControllerBase
 {
     private readonly AniWorldService _aniWorldService;
     private readonly StoService _stoService;
+    private readonly HiAnimeService _hiAnimeService;
     private readonly DownloadService _downloadService;
     private readonly DownloadHistoryService _historyService;
     private readonly IServerConfigurationManager _configManager;
@@ -39,6 +40,7 @@ public class AniWorldController : ControllerBase
     public AniWorldController(
         AniWorldService aniWorldService,
         StoService stoService,
+        HiAnimeService hiAnimeService,
         DownloadService downloadService,
         DownloadHistoryService historyService,
         IServerConfigurationManager configManager,
@@ -46,6 +48,7 @@ public class AniWorldController : ControllerBase
     {
         _aniWorldService = aniWorldService;
         _stoService = stoService;
+        _hiAnimeService = hiAnimeService;
         _downloadService = downloadService;
         _historyService = historyService;
         _configManager = configManager;
@@ -124,7 +127,26 @@ public class AniWorldController : ControllerBase
                 }
             }
 
+            if (config?.HiAnimeConfig.Enabled != false)
+            {
+                try
+                {
+                    var hiResults = await _hiAnimeService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+                    results.AddRange(hiResults);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "HiAnime search failed for query: {Query}", query);
+                }
+            }
+
             return Ok(results);
+        }
+
+        if (string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase))
+        {
+            var hiResults = await _hiAnimeService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+            return Ok(hiResults);
         }
 
         var service = GetService(source);
@@ -145,13 +167,19 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
+        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
+        {
+            var info = await _hiAnimeService.GetSeriesInfoAsync(url, cancellationToken).ConfigureAwait(false);
+            return Ok(info);
+        }
+
         var service = GetService(resolvedSource);
-        var info = await service.GetSeriesInfoAsync(url, cancellationToken).ConfigureAwait(false);
-        return Ok(info);
+        var result = await service.GetSeriesInfoAsync(url, cancellationToken).ConfigureAwait(false);
+        return Ok(result);
     }
 
     /// <summary>
@@ -167,13 +195,19 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
+        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
+        {
+            var episodes = await _hiAnimeService.GetEpisodesAsync(url, cancellationToken).ConfigureAwait(false);
+            return Ok(episodes);
+        }
+
         var service = GetService(resolvedSource);
-        var episodes = await service.GetEpisodesAsync(url, cancellationToken).ConfigureAwait(false);
-        return Ok(episodes);
+        var result = await service.GetEpisodesAsync(url, cancellationToken).ConfigureAwait(false);
+        return Ok(result);
     }
 
     /// <summary>
@@ -189,13 +223,19 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
+        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
+        {
+            var details = await _hiAnimeService.GetEpisodeDetailsAsync(url, cancellationToken).ConfigureAwait(false);
+            return Ok(details);
+        }
+
         var service = GetService(resolvedSource);
-        var details = await service.GetEpisodeDetailsAsync(url, cancellationToken).ConfigureAwait(false);
-        return Ok(details);
+        var result = await service.GetEpisodeDetailsAsync(url, cancellationToken).ConfigureAwait(false);
+        return Ok(result);
     }
 
     /// <summary>
@@ -208,9 +248,15 @@ public class AniWorldController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var resolvedSource = ResolveSource(source);
+        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
+        {
+            var items = await _hiAnimeService.GetPopularAsync(cancellationToken).ConfigureAwait(false);
+            return Ok(items);
+        }
+
         var service = GetService(resolvedSource);
-        var items = await service.GetPopularAsync(cancellationToken).ConfigureAwait(false);
-        return Ok(items);
+        var result = await service.GetPopularAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(result);
     }
 
     /// <summary>
@@ -223,9 +269,15 @@ public class AniWorldController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var resolvedSource = ResolveSource(source);
+        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
+        {
+            var items = await _hiAnimeService.GetNewReleasesAsync(cancellationToken).ConfigureAwait(false);
+            return Ok(items);
+        }
+
         var service = GetService(resolvedSource);
-        var items = await service.GetNewReleasesAsync(cancellationToken).ConfigureAwait(false);
-        return Ok(items);
+        var result = await service.GetNewReleasesAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(result);
     }
 
     // ── Downloads ───────────────────────────────────────────────────
@@ -247,7 +299,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.EpisodeUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.EpisodeUrl);
@@ -259,8 +311,9 @@ public class AniWorldController : ControllerBase
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
         }
 
-        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? "1";
-        var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
+        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
+        var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
         var seriesTitle = request.SeriesTitle ?? "Unknown";
 
         // Check if already downloaded (duplicate detection)
@@ -306,7 +359,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.SeasonUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.SeasonUrl);
@@ -318,12 +371,21 @@ public class AniWorldController : ControllerBase
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
         }
 
-        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? "1";
-        var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
+        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
+        var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
         var seriesTitle = request.SeriesTitle ?? "Unknown";
 
-        var service = GetService(source);
-        var episodes = await service.GetEpisodesAsync(request.SeasonUrl, cancellationToken).ConfigureAwait(false);
+        List<EpisodeRef> episodes;
+        if (isHiAnime)
+        {
+            episodes = await _hiAnimeService.GetEpisodesAsync(request.SeasonUrl, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            var service = GetService(source);
+            episodes = await service.GetEpisodesAsync(request.SeasonUrl, cancellationToken).ConfigureAwait(false);
+        }
 
         if (episodes.Count == 0)
         {
@@ -379,7 +441,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.SeriesUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.SeriesUrl);
@@ -391,11 +453,20 @@ public class AniWorldController : ControllerBase
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
         }
 
-        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? "1";
-        var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
+        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
+        var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
 
-        var service = GetService(source);
-        var seriesInfo = await service.GetSeriesInfoAsync(request.SeriesUrl, cancellationToken).ConfigureAwait(false);
+        SeriesInfo seriesInfo;
+        if (isHiAnime)
+        {
+            seriesInfo = await _hiAnimeService.GetSeriesInfoAsync(request.SeriesUrl, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            var service = GetService(source);
+            seriesInfo = await service.GetSeriesInfoAsync(request.SeriesUrl, cancellationToken).ConfigureAwait(false);
+        }
         var seriesTitle = request.SeriesTitle ?? seriesInfo.Title ?? "Unknown";
 
         if (seriesInfo.Seasons == null || seriesInfo.Seasons.Count == 0)
@@ -408,7 +479,16 @@ public class AniWorldController : ControllerBase
 
         foreach (var season in seriesInfo.Seasons)
         {
-            var episodes = await service.GetEpisodesAsync(season.Url, cancellationToken).ConfigureAwait(false);
+            List<EpisodeRef> episodes;
+            if (isHiAnime)
+            {
+                episodes = await _hiAnimeService.GetEpisodesAsync(season.Url, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                var svc = GetService(source);
+                episodes = await svc.GetEpisodesAsync(season.Url, cancellationToken).ConfigureAwait(false);
+            }
 
             foreach (var ep in episodes)
             {
@@ -439,11 +519,12 @@ public class AniWorldController : ControllerBase
             }
         }
 
-        // Also handle movies if they exist
-        if (seriesInfo.HasMovies)
+        // Also handle movies if they exist (not applicable for hianime)
+        if (seriesInfo.HasMovies && !isHiAnime)
         {
             var movieUrl = request.SeriesUrl.TrimEnd('/') + "/filme";
-            var movies = await service.GetEpisodesAsync(movieUrl, cancellationToken).ConfigureAwait(false);
+            var svc = GetService(source);
+            var movies = await svc.GetEpisodesAsync(movieUrl, cancellationToken).ConfigureAwait(false);
 
             foreach (var ep in movies)
             {
@@ -602,7 +683,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
         }
 
         var completedLanguage = _historyService.GetCompletedLanguage(url);
@@ -621,16 +702,30 @@ public class AniWorldController : ControllerBase
     public ActionResult GetFlag(string lang, string? source = null)
     {
         var isSto = string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase);
+        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
 
-        var resourceName = lang switch
+        string? resourceName;
+        if (isHiAnime)
         {
-            "1" => "Jellyfin.Plugin.AniWorld.Web.german.svg",
-            "2" => isSto
-                ? "Jellyfin.Plugin.AniWorld.Web.english.svg"
-                : "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
-            "3" => "Jellyfin.Plugin.AniWorld.Web.japanese-german.svg",
-            _ => null
-        };
+            resourceName = lang switch
+            {
+                "sub" => "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
+                "dub" => "Jellyfin.Plugin.AniWorld.Web.english.svg",
+                _ => null
+            };
+        }
+        else
+        {
+            resourceName = lang switch
+            {
+                "1" => "Jellyfin.Plugin.AniWorld.Web.german.svg",
+                "2" => isSto
+                    ? "Jellyfin.Plugin.AniWorld.Web.english.svg"
+                    : "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
+                "3" => "Jellyfin.Plugin.AniWorld.Web.japanese-german.svg",
+                _ => null
+            };
+        }
 
         if (resourceName == null)
         {
@@ -659,6 +754,7 @@ public class AniWorldController : ControllerBase
         {
             "aniworld" => "Jellyfin.Plugin.AniWorld.Web.aniworld.svg",
             "sto" => "Jellyfin.Plugin.AniWorld.Web.sto.svg",
+            "hianime" => "Jellyfin.Plugin.AniWorld.Web.hianime.svg",
             _ => null
         };
 

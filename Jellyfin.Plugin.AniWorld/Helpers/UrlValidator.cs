@@ -11,6 +11,7 @@ public static class UrlValidator
     {
         "aniworld.to", "www.aniworld.to",
         "s.to", "www.s.to",
+        "hianime.to", "www.hianime.to",
     };
 
     /// <summary>
@@ -56,13 +57,13 @@ public static class UrlValidator
         if (!IsValidUrl(url))
         {
             throw new ArgumentException(
-                "Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.", paramName);
+                "Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.", paramName);
         }
     }
 
     /// <summary>
     /// Detects the source site from a URL.
-    /// Returns "aniworld" or "sto".
+    /// Returns "aniworld", "sto", or "hianime".
     /// </summary>
     public static string DetectSource(string url)
     {
@@ -78,9 +79,19 @@ public static class UrlValidator
             {
                 return "sto";
             }
+
+            if (host == "hianime.to" || host == "www.hianime.to")
+            {
+                return "hianime";
+            }
         }
 
         // Also check raw string for cases without full URI parsing
+        if (url.Contains("hianime.to/", StringComparison.OrdinalIgnoreCase))
+        {
+            return "hianime";
+        }
+
         if (url.Contains("s.to/", StringComparison.OrdinalIgnoreCase))
         {
             return "sto";

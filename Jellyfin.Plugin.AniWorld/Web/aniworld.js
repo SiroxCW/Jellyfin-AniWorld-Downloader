@@ -43,16 +43,33 @@ export default function (view, params) {
         }
     }
 
-    // Language names per source
+    // Language names per source (plain text)
     function getLangNames(source) {
-        if (source === 'sto') {
-            return { '1': '\uD83C\uDDE9\uD83C\uDDEA German Dub', '2': '\uD83C\uDDEC\uD83C\uDDE7 English Dub' };
+        if (source === 'hianime') {
+            return { 'sub': 'English Sub', 'dub': 'English Dub' };
         }
-        return { '1': '\uD83C\uDDE9\uD83C\uDDEA German Dub', '2': '\uD83C\uDDEC\uD83C\uDDE7 English Sub', '3': '\uD83C\uDDE9\uD83C\uDDEA German Sub' };
+        if (source === 'sto') {
+            return { '1': 'German Dub', '2': 'English Dub' };
+        }
+        return { '1': 'German Dub', '2': 'English Sub', '3': 'German Sub' };
+    }
+
+    // Build language label HTML with flag SVG
+    function langLabelHtml(langKey, source) {
+        var names = getLangNames(source);
+        var name = names[langKey] || ('Language ' + langKey);
+        var flagUrl = ApiClient.getUrl('AniWorld/Flag/' + langKey, { source: source || 'aniworld' });
+        return '<img src="' + flagUrl + '" style="height:1.1em;vertical-align:middle;margin-right:0.4em" onerror="this.style.display=\'none\'">' + esc(name);
     }
 
     // Build language options HTML for season bar
     function getLangOptionsHtml(source) {
+        if (source === 'hianime') {
+            var html = '<option value="">\uD83C\uDF10 Use Settings Default</option>';
+            html += '<option value="sub">\uD83C\uDDEC\uD83C\uDDE7 English Sub</option>';
+            html += '<option value="dub">\uD83C\uDDEC\uD83C\uDDE7 English Dub</option>';
+            return html;
+        }
         var html = '<option value="">\uD83C\uDF10 Use Settings Default</option>';
         html += '<option value="1">\uD83C\uDDE9\uD83C\uDDEA German Dub</option>';
         if (source === 'sto') {
@@ -154,10 +171,22 @@ export default function (view, params) {
                 return [];
             }).catch(function () { return []; }));
 
+            // Load from hianime if enabled
+            promises.push(ApiClient.getPluginConfiguration('e93d1d02-df60-4545-ae3c-7bb87dff024c').then(function (config) {
+                if (config.HiAnimeConfig && config.HiAnimeConfig.Enabled) {
+                    return ApiClient.fetch({
+                        url: ApiClient.getUrl(endpoint, { source: 'hianime' }),
+                        type: 'GET', dataType: 'json'
+                    }).catch(function () { return []; });
+                }
+                return [];
+            }).catch(function () { return []; }));
+
             Promise.all(promises).then(function (results) {
                 AW.browseLoaded[section] = true;
                 AW['browseCache_aniworld_' + section] = results[0] || [];
                 AW['browseCache_sto_' + section] = results[1] || [];
+                AW['browseCache_hianime_' + section] = results[2] || [];
                 AW._renderBrowseCombined(section, container);
             }).catch(function (err) {
                 container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">❌</div>Failed to load: ' + esc(err.message || 'Unknown error') + '</div>';
@@ -167,9 +196,10 @@ export default function (view, params) {
         _renderBrowseCombined: function (section, container) {
             var awItems = this['browseCache_aniworld_' + section] || [];
             var stoItems = this['browseCache_sto_' + section] || [];
+            var hiItems = this['browseCache_hianime_' + section] || [];
             var html = '';
 
-            if (awItems.length === 0 && stoItems.length === 0) {
+            if (awItems.length === 0 && stoItems.length === 0 && hiItems.length === 0) {
                 container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No content found.</div>';
                 return;
             }
@@ -177,6 +207,11 @@ export default function (view, params) {
             if (awItems.length > 0) {
                 html += '<div class="aw-browse-section-title">AniWorld</div>';
                 html += this._buildBrowseGrid(awItems, 'aniworld');
+            }
+
+            if (hiItems.length > 0) {
+                html += '<div class="aw-browse-section-title">HiAnime</div>';
+                html += this._buildBrowseGrid(hiItems, 'hianime');
             }
 
             if (stoItems.length > 0) {
@@ -191,10 +226,14 @@ export default function (view, params) {
             var html = '<div class="aw-browse-grid">';
             items.forEach(function (item) {
                 var itemSource = item.Source || source || 'aniworld';
-                var badgeCls = 'aw-browse-source-badge' + (itemSource === 'aniworld' ? ' aw-badge-aniworld' : '');
                 html += '<div class="aw-browse-card" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\', \'' + escJs(itemSource) + '\')">';
                 html += '<img class="aw-browse-cover" src="' + esc(item.CoverImageUrl) + '" alt="' + esc(item.Title) + '" loading="lazy" onerror="this.style.display=\'none\'" />';
-                html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(itemSource) + '" onerror="this.style.display=\'none\'" />';
+                if (itemSource === 'hianime') {
+                    html += '<span class="aw-browse-source-badge aw-badge-hianime"><img src="' + siteLogoUrl(itemSource) + '" onerror="this.parentNode.style.display=\'none\'" /></span>';
+                } else {
+                    var badgeCls = 'aw-browse-source-badge' + (itemSource === 'aniworld' ? ' aw-badge-aniworld' : '');
+                    html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(itemSource) + '" onerror="this.style.display=\'none\'" />';
+                }
                 html += '<div class="aw-browse-info">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
                 if (item.Genre) {
@@ -251,11 +290,15 @@ export default function (view, params) {
             var html = '<div class="aw-browse-grid">';
             results.forEach(function (item, idx) {
                 var source = item.Source || 'aniworld';
-                var badgeCls = 'aw-browse-source-badge' + (source === 'aniworld' ? ' aw-badge-aniworld' : '');
                 var cardId = 'aw-sr-' + idx;
                 html += '<div class="aw-browse-card" id="' + cardId + '" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\', \'' + escJs(source) + '\')">';
                 html += '<div class="aw-browse-cover aw-cover-placeholder" id="' + cardId + '-cover"></div>';
-                html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" />';
+                if (source === 'hianime') {
+                    html += '<span class="aw-browse-source-badge aw-badge-hianime"><img src="' + siteLogoUrl(source) + '" onerror="this.parentNode.style.display=\'none\'" /></span>';
+                } else {
+                    var badgeCls = 'aw-browse-source-badge' + (source === 'aniworld' ? ' aw-badge-aniworld' : '');
+                    html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" />';
+                }
                 html += '<div class="aw-browse-info">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
                 html += '</div></div>';
@@ -330,12 +373,17 @@ export default function (view, params) {
                 html += '<div class="aw-warning">\u26A0\uFE0F For anime, using AniWorld as source is recommended.</div>';
             }
 
+            if (source === 'hianime') {
+                html += '<div class="aw-warning">\u26A0\uFE0F HiAnime is not recommended. Only use it for English dub or if AniWorld does not have the anime you are looking for. Each HiAnime entry maps to Season 01, so search for the specific season you want.</div>';
+            }
+
             html += '<div class="aw-series">';
             if (series.CoverImageUrl) {
                 html += '<img class="aw-cover" src="' + esc(series.CoverImageUrl) + '" alt="Cover" onerror="this.style.display=\'none\'" />';
             }
             html += '<div class="aw-meta">';
-            html += '<h2><img class="aw-source-logo" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" style="height:1.3em"> ' + esc(series.Title) + '</h2>';
+            var logoClass = source === 'hianime' ? 'aw-source-logo-wide' : 'aw-source-logo';
+            html += '<h2><img class="' + logoClass + '" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" style="height:1.3em"> ' + esc(series.Title) + '</h2>';
 
             if (series.Genres && series.Genres.length > 0) {
                 html += '<div class="aw-genres">';
@@ -360,7 +408,8 @@ export default function (view, params) {
                 html += '<div class="aw-seasons">';
                 series.Seasons.forEach(function (season, idx) {
                     var cls = idx === 0 ? ' active' : '';
-                    html += '<button class="aw-season' + cls + '" data-url="' + esc(season.Url) + '" onclick="window.AW.loadSeason(\'' + encodeURIComponent(season.Url) + '\', this)">Season ' + season.Number + '</button>';
+                    var seasonLabel = source === 'hianime' ? 'Season' : 'Season ' + season.Number;
+                    html += '<button class="aw-season' + cls + '" data-url="' + esc(season.Url) + '" onclick="window.AW.loadSeason(\'' + encodeURIComponent(season.Url) + '\', this)">' + seasonLabel + '</button>';
                 });
                 if (series.HasMovies) {
                     var movieUrl = seriesUrl + '/filme';
@@ -529,14 +578,13 @@ export default function (view, params) {
                 type: 'GET',
                 dataType: 'json'
             }).then(function (details) {
-                var langNames = getLangNames(source);
                 var html = '';
 
                 var hasAny = false;
                 for (var langKey in details.ProvidersByLanguage) {
                     hasAny = true;
                     html += '<div class="aw-lang-group">';
-                    html += '<div class="aw-lang-label">' + esc(langNames[langKey] || 'Language ' + langKey) + '</div>';
+                    html += '<div class="aw-lang-label">' + langLabelHtml(langKey, source) + '</div>';
                     html += '<div class="aw-provider-btns">';
                     var providers = details.ProvidersByLanguage[langKey];
                     for (var prov in providers) {

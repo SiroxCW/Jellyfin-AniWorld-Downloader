@@ -29,6 +29,7 @@ public class DownloadService
 
     private readonly AniWorldService _aniWorldService;
     private readonly StoService _stoService;
+    private readonly HiAnimeService _hiAnimeService;
     private readonly DownloadHistoryService _historyService;
     private readonly IEnumerable<IStreamExtractor> _extractors;
     private readonly ILibraryMonitor _libraryMonitor;
@@ -45,6 +46,7 @@ public class DownloadService
     public DownloadService(
         AniWorldService aniWorldService,
         StoService stoService,
+        HiAnimeService hiAnimeService,
         DownloadHistoryService historyService,
         IEnumerable<IStreamExtractor> extractors,
         ILibraryMonitor libraryMonitor,
@@ -52,6 +54,7 @@ public class DownloadService
     {
         _aniWorldService = aniWorldService;
         _stoService = stoService;
+        _hiAnimeService = hiAnimeService;
         _historyService = historyService;
         _extractors = extractors;
         _libraryMonitor = libraryMonitor;
@@ -398,6 +401,12 @@ public class DownloadService
     {
         token.ThrowIfCancellationRequested();
 
+        if (string.Equals(task.Source, "hianime", StringComparison.OrdinalIgnoreCase))
+        {
+            await ExecuteHiAnimeDownloadAsync(task, token).ConfigureAwait(false);
+            return;
+        }
+
         task.Status = DownloadStatus.Resolving;
         _historyService.UpdateDownload(task);
 
@@ -479,6 +488,60 @@ public class DownloadService
 
         await DownloadWithFfmpegAsync(task, token).ConfigureAwait(false);
 
+        VerifyDownloadedFile(task, token);
+    }
+
+    /// <summary>
+    /// Executes the HiAnime-specific download pipeline: MegaCloud extraction with HD-2/HD-3 fallback.
+    /// </summary>
+    private async Task ExecuteHiAnimeDownloadAsync(DownloadTask task, CancellationToken token)
+    {
+        task.Status = DownloadStatus.Resolving;
+        _historyService.UpdateDownload(task);
+
+        // Get episode title
+        var details = await _hiAnimeService.GetEpisodeDetailsAsync(task.EpisodeUrl, token).ConfigureAwait(false);
+        task.EpisodeTitle = details.TitleEn ?? "Unknown";
+
+        var newPath = PathHelper.InsertEpisodeTitleInPath(task.OutputPath, task.EpisodeTitle);
+        if (newPath != task.OutputPath)
+        {
+            task.OutputPath = newPath;
+            _logger.LogDebug("Updated output path with episode title: {Path}", newPath);
+        }
+
+        token.ThrowIfCancellationRequested();
+
+        task.Status = DownloadStatus.Extracting;
+        _historyService.UpdateDownload(task);
+
+        // Full MegaCloud extraction with HD-2 -> HD-3 fallback
+        var streamResult = await _hiAnimeService.GetStreamAsync(task.EpisodeUrl, task.Language, token).ConfigureAwait(false);
+        if (streamResult == null)
+        {
+            throw new InvalidOperationException("Failed to extract stream from HiAnime (all servers failed)");
+        }
+
+        task.StreamUrl = streamResult.Url;
+        task.Status = DownloadStatus.Downloading;
+        _historyService.UpdateDownload(task);
+
+        var dir = Path.GetDirectoryName(task.OutputPath);
+        if (!string.IsNullOrEmpty(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        await DownloadWithFfmpegAsync(task, token, streamResult.Headers).ConfigureAwait(false);
+
+        VerifyDownloadedFile(task, token);
+    }
+
+    /// <summary>
+    /// Verifies the downloaded file exists and has content, marks task as completed.
+    /// </summary>
+    private void VerifyDownloadedFile(DownloadTask task, CancellationToken token)
+    {
         if (token.IsCancellationRequested)
         {
             task.Status = DownloadStatus.Cancelled;
@@ -674,7 +737,10 @@ public class DownloadService
     /// Downloads a stream using ffmpeg. Uses ArgumentList to avoid shell injection
     /// and argument quoting issues with URLs or file paths containing special characters.
     /// </summary>
-    private async Task DownloadWithFfmpegAsync(DownloadTask task, CancellationToken cancellationToken)
+    private async Task DownloadWithFfmpegAsync(
+        DownloadTask task,
+        CancellationToken cancellationToken,
+        Dictionary<string, string>? extraHeaders = null)
     {
         var ffmpegPath = FindFfmpeg();
         if (string.IsNullOrEmpty(ffmpegPath))
@@ -699,6 +765,15 @@ public class DownloadService
         startInfo.ArgumentList.Add("1");
         startInfo.ArgumentList.Add("-reconnect_delay_max");
         startInfo.ArgumentList.Add("5");
+
+        // Add extra headers (e.g., Referer for HiAnime/MegaCloud)
+        if (extraHeaders != null && extraHeaders.Count > 0)
+        {
+            var headerStr = string.Join("\r\n", extraHeaders.Select(h => $"{h.Key}: {h.Value}")) + "\r\n";
+            startInfo.ArgumentList.Add("-headers");
+            startInfo.ArgumentList.Add(headerStr);
+        }
+
         startInfo.ArgumentList.Add("-i");
         startInfo.ArgumentList.Add(task.StreamUrl!);
         startInfo.ArgumentList.Add("-c");

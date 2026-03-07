@@ -46,6 +46,15 @@ public class PluginConfiguration : BasePluginConfiguration
         PreferredProvider = "VOE",
     };
 
+    /// <summary>
+    /// Gets or sets the HiAnime (hianime.to) downloader configuration.
+    /// </summary>
+    public SiteDownloaderConfig HiAnimeConfig { get; set; } = new()
+    {
+        Enabled = true,
+        PreferredLanguage = "sub",
+    };
+
     // ── Legacy flat properties (backward compat / used as AniWorld defaults) ──
 
     /// <summary>
@@ -72,11 +81,27 @@ public class PluginConfiguration : BasePluginConfiguration
 
     /// <summary>
     /// Resolves the effective download path for a given source.
+    /// HiAnime falls back to AniWorld's path if empty (both are anime).
     /// </summary>
     public string GetDownloadPath(string source)
     {
         var siteConfig = GetSiteConfig(source);
-        return !string.IsNullOrEmpty(siteConfig.DownloadPath) ? siteConfig.DownloadPath : DownloadPath;
+        if (!string.IsNullOrEmpty(siteConfig.DownloadPath))
+        {
+            return siteConfig.DownloadPath;
+        }
+
+        // HiAnime falls back to AniWorld's path since both are anime
+        if (string.Equals(source, "hianime", System.StringComparison.OrdinalIgnoreCase))
+        {
+            var awPath = AniWorldConfig.DownloadPath;
+            if (!string.IsNullOrEmpty(awPath))
+            {
+                return awPath;
+            }
+        }
+
+        return DownloadPath;
     }
 
     /// <summary>
@@ -111,9 +136,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public SiteDownloaderConfig GetSiteConfig(string source)
     {
-        return string.Equals(source, "sto", System.StringComparison.OrdinalIgnoreCase)
-            ? StoConfig
-            : AniWorldConfig;
+        return source?.ToLowerInvariant() switch
+        {
+            "sto" => StoConfig,
+            "hianime" => HiAnimeConfig,
+            _ => AniWorldConfig,
+        };
     }
 }
 
