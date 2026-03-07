@@ -1,10 +1,13 @@
 # Jellyfin AniWorld Downloader
 
+![GitHub Release](https://img.shields.io/github/v/release/SiroxCW/Jellyfin-AniWorld-Downloader)
+![GitHub License](https://img.shields.io/github/license/SiroxCW/Jellyfin-AniWorld-Downloader)
+
 A Jellyfin plugin for searching and downloading anime and series from [aniworld.to](https://aniworld.to) and [s.to](https://s.to), directly inside Jellyfin's web interface.
 
-Series View |
-:-------------------------:|
-![Series View](screenshots/series.png) |
+Series View| Search View
+:---:|:---:
+![Series View](screenshots/preview_anime.png) | ![Search View](screenshots/preview_search.png)
 
 ## Features
 
