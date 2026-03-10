@@ -160,9 +160,12 @@ export default function (view, params) {
                 type: 'GET', dataType: 'json'
             }).catch(function () { return []; }));
 
-            // Load from s.to if enabled
-            promises.push(ApiClient.getPluginConfiguration('e93d1d02-df60-4545-ae3c-7bb87dff024c').then(function (config) {
-                if (config.StoConfig && config.StoConfig.Enabled) {
+            // Load from s.to and hianime if enabled (uses EnabledSources endpoint)
+            promises.push(ApiClient.fetch({
+                url: ApiClient.getUrl('AniWorld/EnabledSources'),
+                type: 'GET', dataType: 'json'
+            }).then(function (sources) {
+                if (sources.sto) {
                     return ApiClient.fetch({
                         url: ApiClient.getUrl(endpoint, { source: 'sto' }),
                         type: 'GET', dataType: 'json'
@@ -171,9 +174,11 @@ export default function (view, params) {
                 return [];
             }).catch(function () { return []; }));
 
-            // Load from hianime if enabled
-            promises.push(ApiClient.getPluginConfiguration('e93d1d02-df60-4545-ae3c-7bb87dff024c').then(function (config) {
-                if (config.HiAnimeConfig && config.HiAnimeConfig.Enabled) {
+            promises.push(ApiClient.fetch({
+                url: ApiClient.getUrl('AniWorld/EnabledSources'),
+                type: 'GET', dataType: 'json'
+            }).then(function (sources) {
+                if (sources.hianime) {
                     return ApiClient.fetch({
                         url: ApiClient.getUrl(endpoint, { source: 'hianime' }),
                         type: 'GET', dataType: 'json'
@@ -1031,6 +1036,14 @@ export default function (view, params) {
 
     // Expose globally for onclick handlers in dynamic HTML
     window.AW = AW;
+
+    // Hide settings button when opened from sidebar (non-admin view)
+    if (params && params.sidebar) {
+        var settingsBtn = view.querySelector('#aw-settings-btn');
+        if (settingsBtn) {
+            settingsBtn.style.display = 'none';
+        }
+    }
 
     // Bind Enter key to search
     var searchInput = view.querySelector('#aw-search-input');

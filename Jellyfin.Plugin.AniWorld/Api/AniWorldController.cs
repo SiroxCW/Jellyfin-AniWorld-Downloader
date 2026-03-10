@@ -83,6 +83,75 @@ public class AniWorldController : ControllerBase
         return "aniworld";
     }
 
+    // ── Non-admin access endpoints ────────────────────────────────────
+
+    /// <summary>
+    /// Serves the injection script for non-admin sidebar access.
+    /// </summary>
+    [HttpGet("InjectionScript")]
+    [AllowAnonymous]
+    public ActionResult GetInjectionScript()
+    {
+        var stream = Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream("Jellyfin.Plugin.AniWorld.Web.injection.js");
+        if (stream == null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "application/javascript");
+    }
+
+    /// <summary>
+    /// Serves the main plugin page HTML for non-admin rendering.
+    /// </summary>
+    [HttpGet("Page")]
+    [AllowAnonymous]
+    public ActionResult GetPage()
+    {
+        var stream = Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream("Jellyfin.Plugin.AniWorld.Web.aniworld.html");
+        if (stream == null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "text/html");
+    }
+
+    /// <summary>
+    /// Serves the main plugin page JavaScript for non-admin rendering.
+    /// </summary>
+    [HttpGet("PageScript")]
+    [AllowAnonymous]
+    public ActionResult GetPageScript()
+    {
+        var stream = Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream("Jellyfin.Plugin.AniWorld.Web.aniworld.js");
+        if (stream == null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "application/javascript");
+    }
+
+    /// <summary>
+    /// Returns which sources are enabled in the configuration.
+    /// </summary>
+    [HttpGet("EnabledSources")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult GetEnabledSources()
+    {
+        var config = Plugin.Instance?.Configuration;
+        return Ok(new
+        {
+            aniworld = config?.AniWorldConfig.Enabled ?? true,
+            sto = config?.StoConfig.Enabled ?? false,
+            hianime = config?.HiAnimeConfig.Enabled ?? true
+        });
+    }
+
     // ── Search & Browse ─────────────────────────────────────────────
 
     /// <summary>

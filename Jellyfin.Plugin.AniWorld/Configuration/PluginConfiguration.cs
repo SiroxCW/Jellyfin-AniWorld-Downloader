@@ -25,6 +25,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public bool AutoScanLibrary { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets whether non-admin users can access the plugin UI.
+    /// Requires the File Transformation plugin and a server restart.
+    /// </summary>
+    public bool EnableNonAdminAccess { get; set; } = false;
+
     // ── Per-site configs ─────────────────────────────────────────
 
     /// <summary>
