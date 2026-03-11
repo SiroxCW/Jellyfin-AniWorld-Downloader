@@ -391,7 +391,7 @@ public class AniWorldController : ControllerBase
             return BadRequest("This episode has already been downloaded in this language.");
         }
 
-        var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl);
+        var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl, request.EpisodeNumber);
 
         var taskId = await _downloadService.StartDownloadAsync(
             request.EpisodeUrl,
@@ -400,7 +400,8 @@ public class AniWorldController : ControllerBase
             outputPath,
             seriesTitle,
             source,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            request.EpisodeNumber).ConfigureAwait(false);
 
         if (taskId == null)
         {
@@ -465,7 +466,7 @@ public class AniWorldController : ControllerBase
 
         foreach (var ep in episodes)
         {
-            var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
+            var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url, isHiAnime ? ep.Number : null);
 
             if (_downloadService.IsAlreadyDownloaded(ep.Url, language))
             {
@@ -479,7 +480,8 @@ public class AniWorldController : ControllerBase
                 outputPath,
                 seriesTitle,
                 source,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                isHiAnime ? ep.Number : null).ConfigureAwait(false);
 
             if (taskId == null) continue;
 
@@ -561,7 +563,7 @@ public class AniWorldController : ControllerBase
 
             foreach (var ep in episodes)
             {
-                var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
+                var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url, isHiAnime ? ep.Number : null);
 
                 if (_downloadService.IsAlreadyDownloaded(ep.Url, language))
                 {
@@ -576,7 +578,8 @@ public class AniWorldController : ControllerBase
                     outputPath,
                     seriesTitle,
                     source,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    isHiAnime ? ep.Number : null).ConfigureAwait(false);
 
                 if (taskId == null) { skippedCount++; continue; }
 
@@ -891,6 +894,9 @@ public class DownloadRequest
 
     /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
     public string? Source { get; set; }
+
+    /// <summary>Gets or sets the sequential episode number (used for HiAnime where URL contains an internal ID, not the episode number).</summary>
+    public int? EpisodeNumber { get; set; }
 }
 
 /// <summary>

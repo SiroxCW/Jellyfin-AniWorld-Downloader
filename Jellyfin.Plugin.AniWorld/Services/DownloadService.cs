@@ -134,7 +134,8 @@ public class DownloadService
         string outputPath,
         string seriesTitle,
         string source = "aniworld",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? episodeNumber = null)
     {
         DownloadTask task;
 
@@ -151,7 +152,7 @@ public class DownloadService
             }
 
             var taskId = Guid.NewGuid().ToString("N")[..12];
-            var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl);
+            var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl, episodeNumber);
 
             task = new DownloadTask
             {
