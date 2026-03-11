@@ -29,6 +29,7 @@ This plugin is a lightweight downloader built into Jellyfin for convenience. If 
 
 - Jellyfin **10.9.0** or newer
 - **ffmpeg** (bundled with Jellyfin)
+- **[File Transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation)** plugin (optional, required for non-admin access)
 
 ## Installation
 
@@ -85,6 +86,7 @@ After installing, go to **Dashboard > Plugins > AniWorld Downloader** to configu
 | Max Concurrent Downloads | How many downloads run at the same time (default: 2) |
 | Max Retry Attempts | How many times to retry a failed download before giving up (default: 3) |
 | Auto-scan Library | Trigger a Jellyfin library scan when a download finishes |
+| Enable for non-admin users | Allow non-admin users to access the downloader via the sidebar (see [Non-admin access](#non-admin-access)) |
 
 ### Per-site settings (aniworld.to / s.to / hianime.to)
 
@@ -100,9 +102,24 @@ Each site can be enabled or disabled independently and has its own settings. If 
 
 > **Note:** HiAnime is best used for English dub or when aniworld.to does not have the anime you are looking for. HiAnime does not have seasons, so each entry maps to a single season. Search for the specific season you want. HiAnime's download path defaults to the AniWorld download path if left empty.
 
+## Non-admin access
+
+By default, the plugin UI is only accessible from the admin dashboard. You can enable it for all users so it appears as a sidebar entry.
+
+### Setup
+
+1. Install the [File Transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation) plugin
+2. Restart Jellyfin
+3. Go to **Dashboard > Plugins > AniWorld Downloader** and enable **Enable for non-admin users**
+4. Restart Jellyfin again
+
+Non-admin users will see an **AniWorld Downloader** entry in the sidebar that opens the full UI in a modal overlay. The settings button is hidden in this view. Configuration is only available through the admin dashboard.
+
+> **Note:** The File Transformation plugin injects a script tag into Jellyfin's `index.html` at runtime (no files are modified on disk). Disabling the setting and restarting will remove the sidebar entry.
+
 ## Usage
 
-1. Open **AniWorld Downloader** from the admin dashboard sidebar
+1. Open **AniWorld Downloader** from the admin dashboard sidebar (or the sidebar entry if non-admin access is enabled)
 2. Use **Search** to find a title, or browse **Popular** / **New Releases**
 3. Click a title to see its seasons and episodes
 4. Hit **Download** on an episode, or use **Download Season** / **Download All Seasons** for batch downloads
