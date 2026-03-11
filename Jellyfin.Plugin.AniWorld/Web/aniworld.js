@@ -491,7 +491,7 @@ export default function (view, params) {
                 bar += getLangOptionsHtml(source);
                 bar += '</select>';
                 bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')">\u2B07\uFE0F Download Season</button>';
-                if (AW.currentSeriesUrl) {
+                if (AW.currentSeriesUrl && source !== 'hianime') {
                     bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')">\u2B07\uFE0F Download All Seasons</button>';
                 }
                 bar += '</div>';
