@@ -500,8 +500,8 @@ export default function (view, params) {
                 html += '<span class="aw-ep-title" id="' + epId + '-title">Loading...</span>';
                 html += '<span class="aw-ep-downloaded" id="' + epId + '-dl" style="display:none"></span>';
                 html += '<div class="aw-ep-actions">';
-                html += '<button class="aw-btn aw-btn-primary aw-btn-sm" onclick="window.AW.downloadEpisode(\'' + encodeURIComponent(ep.Url) + '\')">\u2B07\uFE0F Download</button>';
-                html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.toggleProviders(\'' + encodeURIComponent(ep.Url) + '\', \'' + epId + '\')">Providers</button>';
+                html += '<button class="aw-btn aw-btn-primary aw-btn-sm" onclick="window.AW.downloadEpisode(\'' + encodeURIComponent(ep.Url) + '\', ' + ep.Number + ')">\u2B07\uFE0F Download</button>';
+                html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.toggleProviders(\'' + encodeURIComponent(ep.Url) + '\', \'' + epId + '\', ' + ep.Number + ')">Providers</button>';
                 html += '</div>';
                 html += '</div>';
                 html += '<div id="' + epId + '-providers" class="aw-ep-providers" style="display:none"></div>';
@@ -564,7 +564,7 @@ export default function (view, params) {
         },
 
         // ── Providers ──
-        toggleProviders: function (encodedUrl, epId) {
+        toggleProviders: function (encodedUrl, epId, episodeNumber) {
             var panel = view.querySelector('#' + epId + '-providers');
             if (!panel) return;
 
@@ -593,7 +593,7 @@ export default function (view, params) {
                     html += '<div class="aw-provider-btns">';
                     var providers = details.ProvidersByLanguage[langKey];
                     for (var prov in providers) {
-                        html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.downloadWithOptions(\'' + encodeURIComponent(url) + '\', \'' + escJs(langKey) + '\', \'' + escJs(prov) + '\')">' + esc(prov) + '</button>';
+                        html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.downloadWithOptions(\'' + encodeURIComponent(url) + '\', \'' + escJs(langKey) + '\', \'' + escJs(prov) + '\', ' + episodeNumber + ')">' + esc(prov) + '</button>';
                     }
                     html += '</div></div>';
                 }
@@ -609,16 +609,16 @@ export default function (view, params) {
         },
 
         // ── Downloads ──
-        downloadEpisode: function (encodedUrl) {
+        downloadEpisode: function (encodedUrl, episodeNumber) {
             var url = decodeURIComponent(encodedUrl);
             var langSelect = view.querySelector('#aw-season-lang');
             var lang = (langSelect && langSelect.value) ? langSelect.value : null;
-            this._startDownload(url, lang, null);
+            this._startDownload(url, lang, null, episodeNumber);
         },
 
-        downloadWithOptions: function (encodedUrl, langKey, provider) {
+        downloadWithOptions: function (encodedUrl, langKey, provider, episodeNumber) {
             var url = decodeURIComponent(encodedUrl);
-            this._startDownload(url, langKey, provider);
+            this._startDownload(url, langKey, provider, episodeNumber);
         },
 
         downloadSeason: function (encodedSeasonUrl) {
@@ -688,7 +688,7 @@ export default function (view, params) {
             });
         },
 
-        _startDownload: function (episodeUrl, langKey, provider) {
+        _startDownload: function (episodeUrl, langKey, provider, episodeNumber) {
             var body = {
                 EpisodeUrl: episodeUrl,
                 SeriesTitle: this.currentSeriesTitle,
@@ -696,6 +696,7 @@ export default function (view, params) {
             };
             if (langKey) body.LanguageKey = langKey;
             if (provider) body.Provider = provider;
+            if (episodeNumber != null) body.EpisodeNumber = episodeNumber;
 
             ApiClient.fetch({
                 url: ApiClient.getUrl('AniWorld/Download'),
