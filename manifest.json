@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.5.0.0",
+        "changelog": "v1.5.0.0\n- Feature: HiAnime.to support for English dubbed anime\n- Feature: Sidebar access for non-admin users via File Transformation plugin\n- Feature: Separated download paths per language\n- Feature: Option to disable English-sub downloads for HiAnime and AniWorld\n- Feature: Option to force English-dub only downloads for HiAnime\n- Feature: HiAnime download merging for more accurate downloads\n- Fix: HiAnime wrong episode file naming\n- Fix: User downloader panel not responding if admin panel was used before\n- Fix: Narrowed folder selection for HiAnime to only HiAnime-accessible titles\n- Fix: Hidden irrelevant Download All button for HiAnime source titles\n- Fix: Various stability improvements",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.5.0.0/jellyfin-aniworld-downloader-v1.5.0.0.zip",
+        "checksum": "843dda2ce3787f6bf84465cd3aa2adfe",
+        "timestamp": "2026-03-11T21:38:48Z"
+      },
+      {
         "version": "1.4.0.1",
         "changelog": "v1.4.0.1\n- Change default AniWorld provider to Vidmoly (faster downloads) with VOE as fallback\n- Set default s.to provider to VOE\n- Improved README documentation",
         "targetAbi": "10.9.0.0",
