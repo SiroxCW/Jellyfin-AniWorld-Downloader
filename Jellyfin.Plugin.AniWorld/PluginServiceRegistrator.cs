@@ -15,9 +15,11 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        serviceCollection.AddHttpClient("AniWorld", c => c.Timeout = TimeSpan.FromSeconds(50));
-        serviceCollection.AddHttpClient("STO", c => c.Timeout = TimeSpan.FromSeconds(50));
-        serviceCollection.AddHttpClient("HiAnime", c => c.Timeout = TimeSpan.FromSeconds(50));
+        private const int HttpClientTimeoutSeconds = 50;
+        
+        serviceCollection.AddHttpClient("AniWorld", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds));
+        serviceCollection.AddHttpClient("STO", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds));
+        serviceCollection.AddHttpClient("HiAnime", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds));
         serviceCollection.AddSingleton<AniWorldService>();
         serviceCollection.AddSingleton<StoService>();
         serviceCollection.AddSingleton<HiAnimeService>();
