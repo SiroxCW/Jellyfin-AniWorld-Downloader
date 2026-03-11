@@ -103,6 +103,7 @@ export default function (view, params) {
         episodeOffset: 0,
         existingFoldersLoaded: false,
         hiAnimeOnlyDub: false,
+        aniWorldOnlyGerman: false,
 
         browseLoaded: { popular: false, new: false },
 
@@ -519,6 +520,19 @@ export default function (view, params) {
                         langSel.title = 'Locked to English Dub by admin setting';
                     }
                 }
+
+                // Enforce "Only German Sub and German Dub" setting for AniWorld
+                if (source === 'aniworld' && AW.aniWorldOnlyGerman) {
+                    var langSel2 = view.querySelector('#aw-season-lang');
+                    if (langSel2) {
+                        // Remove the English Sub option (value="2")
+                        var engOpt = langSel2.querySelector('option[value="2"]');
+                        if (engOpt) engOpt.remove();
+                        // If current value was English Sub, switch to German Dub
+                        if (langSel2.value === '2') langSel2.value = '1';
+                        langSel2.title = 'English Sub disabled by admin setting';
+                    }
+                }
             }
 
             var html = '<div class="aw-episodes">';
@@ -617,6 +631,10 @@ export default function (view, params) {
 
                 var hasAny = false;
                 for (var langKey in details.ProvidersByLanguage) {
+                    // Skip blocked languages based on admin settings
+                    if (source === 'hianime' && AW.hiAnimeOnlyDub && langKey !== 'dub') continue;
+                    if (source === 'aniworld' && AW.aniWorldOnlyGerman && langKey === '2') continue;
+
                     hasAny = true;
                     html += '<div class="aw-lang-group">';
                     html += '<div class="aw-lang-label">' + langLabelHtml(langKey, source) + '</div>';
@@ -1228,6 +1246,7 @@ export default function (view, params) {
         dataType: 'json'
     }).then(function (sources) {
         AW.hiAnimeOnlyDub = sources.hiAnimeOnlyDub === true;
+        AW.aniWorldOnlyGerman = sources.aniWorldOnlyGerman === true;
     }).catch(function () { /* ignore */ });
 
     // Hide settings button when opened from sidebar (non-admin view)
