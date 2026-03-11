@@ -194,8 +194,7 @@ public class DownloadHistoryService : IDisposable
     }
 
     /// <summary>
-    /// Checks if an episode's most recent completed download matches the requested language.
-    /// Since re-downloading in a different language overwrites the file, only the latest matters.
+    /// Checks if an episode has already been completed for a specific language.
     /// </summary>
     public bool IsAlreadyDownloaded(string episodeUrl, string language)
     {
@@ -205,16 +204,14 @@ public class DownloadHistoryService : IDisposable
             {
                 using var cmd = _db.CreateCommand();
                 cmd.CommandText = @"
-                    SELECT language FROM download_history
-                    WHERE episode_url = @url AND status = 'Completed'
-                    ORDER BY completed_at DESC
-                    LIMIT 1
+                    SELECT COUNT(1) FROM download_history
+                    WHERE episode_url = @url AND language = @lang AND status = 'Completed'
                 ";
                 cmd.Parameters.AddWithValue("@url", episodeUrl);
+                cmd.Parameters.AddWithValue("@lang", language);
 
                 var result = cmd.ExecuteScalar();
-                return result is string lastLang &&
-                       lastLang.Equals(language, StringComparison.Ordinal);
+                return result is long count && count > 0;
             }
             catch (Exception ex)
             {
@@ -226,7 +223,6 @@ public class DownloadHistoryService : IDisposable
 
     /// <summary>
     /// Returns the language of the most recent completed download for this episode.
-    /// Since re-downloading in a different language overwrites the file, only the latest matters.
     /// </summary>
     public string? GetCompletedLanguage(string episodeUrl)
     {
@@ -250,6 +246,43 @@ public class DownloadHistoryService : IDisposable
             {
                 _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
                 return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns all distinct languages for which this episode has been successfully downloaded.
+    /// </summary>
+    public List<string> GetCompletedLanguages(string episodeUrl)
+    {
+        lock (_dbLock)
+        {
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT DISTINCT language FROM download_history
+                    WHERE episode_url = @url AND status = 'Completed'
+                ";
+                cmd.Parameters.AddWithValue("@url", episodeUrl);
+
+                var languages = new List<string>();
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var lang = reader.GetString(0);
+                    if (!string.IsNullOrEmpty(lang))
+                    {
+                        languages.Add(lang);
+                    }
+                }
+
+                return languages;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
+                return new List<string>();
             }
         }
     }

@@ -597,10 +597,14 @@ export default function (view, params) {
                 type: 'GET',
                 dataType: 'json'
             }).then(function (result) {
-                if (result && result.downloaded && result.language) {
+                if (result && result.downloaded && result.languages && result.languages.length > 0) {
                     var badge = view.querySelector('#' + epId + '-dl');
                     if (badge) {
-                        badge.innerHTML = '\u2713 <img src="' + ApiClient.getUrl('AniWorld/Flag/' + result.language, { source: source }) + '">';
+                        var html = '\u2713 ';
+                        for (var i = 0; i < result.languages.length; i++) {
+                            html += '<img src="' + ApiClient.getUrl('AniWorld/Flag/' + result.languages[i], { source: source }) + '" style="height:1.1em;vertical-align:middle;margin-right:0.2em">';
+                        }
+                        badge.innerHTML = html;
                         badge.style.display = '';
                     }
                 }

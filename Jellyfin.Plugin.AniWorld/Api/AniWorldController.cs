@@ -983,8 +983,8 @@ public class AniWorldController : ControllerBase
             return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
         }
 
-        var completedLanguage = _historyService.GetCompletedLanguage(url);
-        return Ok(new { downloaded = completedLanguage != null, language = completedLanguage, url });
+        var completedLanguages = _historyService.GetCompletedLanguages(url);
+        return Ok(new { downloaded = completedLanguages.Count > 0, languages = completedLanguages, url });
     }
 
     /// <summary>

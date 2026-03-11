@@ -1,3 +1,4 @@
+using System;
 using Jellyfin.Plugin.AniWorld.Extractors;
 using Jellyfin.Plugin.AniWorld.Services;
 using MediaBrowser.Controller;
@@ -14,9 +15,9 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        serviceCollection.AddHttpClient("AniWorld");
-        serviceCollection.AddHttpClient("STO");
-        serviceCollection.AddHttpClient("HiAnime");
+        serviceCollection.AddHttpClient("AniWorld", c => c.Timeout = TimeSpan.FromSeconds(50));
+        serviceCollection.AddHttpClient("STO", c => c.Timeout = TimeSpan.FromSeconds(50));
+        serviceCollection.AddHttpClient("HiAnime", c => c.Timeout = TimeSpan.FromSeconds(50));
         serviceCollection.AddSingleton<AniWorldService>();
         serviceCollection.AddSingleton<StoService>();
         serviceCollection.AddSingleton<HiAnimeService>();

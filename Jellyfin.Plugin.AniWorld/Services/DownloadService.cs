@@ -377,12 +377,32 @@ public class DownloadService
                     return true;
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
+                // User-initiated cancellation — stop immediately
                 task.Status = DownloadStatus.Cancelled;
                 _historyService.UpdateDownload(task);
                 CleanupFileOnCancel(task.OutputPath, task.Source, task.Language);
                 return true;
+            }
+            catch (OperationCanceledException ex)
+            {
+                // HttpClient timeout — treat as a retryable failure
+                _logger.LogWarning("Download attempt {Attempt}/{MaxRetries} timed out for {Url} with {Provider}",
+                    attempt + 1, maxRetries + 1, task.EpisodeUrl, task.Provider);
+                task.Error = "Request timed out";
+
+                if (attempt >= maxRetries)
+                {
+                    task.Status = DownloadStatus.Failed;
+                    task.Error = $"Failed after {maxRetries + 1} attempts with {task.Provider}: Request timed out";
+                    _historyService.UpdateDownload(task);
+                    _logger.LogError(ex, "Download failed for {Url} after {Attempts} attempts with {Provider} (timeout)",
+                        task.EpisodeUrl, maxRetries + 1, task.Provider);
+                    return false;
+                }
+
+                continue;
             }
             catch (Exception ex)
             {
