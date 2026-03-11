@@ -134,8 +134,8 @@ public class PluginConfiguration : BasePluginConfiguration
     }
 
     /// <summary>
-    /// Returns all distinct non-empty download paths configured for a source (across all languages).
-    /// Used for listing existing folders across all possible download locations.
+    /// Returns all distinct non-empty download paths explicitly configured for a source.
+    /// No fallbacks — only returns paths set directly on this site's config.
     /// </summary>
     public List<string> GetAllDownloadPaths(string source)
     {
@@ -147,20 +147,6 @@ public class PluginConfiguration : BasePluginConfiguration
         AddNonEmpty(paths, siteConfig.DownloadPath3);
         AddNonEmpty(paths, siteConfig.DownloadPathSub);
         AddNonEmpty(paths, siteConfig.DownloadPathDub);
-        AddNonEmpty(paths, siteConfig.DownloadPath);
-
-        // HiAnime also checks AniWorld paths
-        if (string.Equals(source, "hianime", System.StringComparison.OrdinalIgnoreCase))
-        {
-            AddNonEmpty(paths, AniWorldConfig.DownloadPath1);
-            AddNonEmpty(paths, AniWorldConfig.DownloadPath2);
-            AddNonEmpty(paths, AniWorldConfig.DownloadPath3);
-            AddNonEmpty(paths, AniWorldConfig.DownloadPathSub);
-            AddNonEmpty(paths, AniWorldConfig.DownloadPathDub);
-            AddNonEmpty(paths, AniWorldConfig.DownloadPath);
-        }
-
-        AddNonEmpty(paths, DownloadPath);
 
         return paths.ToList();
     }
