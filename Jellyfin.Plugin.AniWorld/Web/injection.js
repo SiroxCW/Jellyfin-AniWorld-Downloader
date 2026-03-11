@@ -64,10 +64,10 @@
     }
 
     function showModal() {
+        // Always remove old modal to avoid stale window.AW references
         var existing = document.getElementById(MODAL_ID);
         if (existing) {
-            existing.style.display = 'flex';
-            return;
+            existing.remove();
         }
 
         // Create full-screen modal
