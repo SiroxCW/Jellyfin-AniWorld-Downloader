@@ -167,6 +167,59 @@ public static class PathHelper
     }
 
     /// <summary>
+    /// Regex to extract episode numbers from filenames like "SeriesName - S01E05.mkv" or "SeriesName - S01E05 - Title.mkv".
+    /// </summary>
+    private static readonly Regex EpisodeFilePattern = new(
+        @"- S\d{2}E(?<episode>\d{2,})",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Builds a Jellyfin-compatible output path using a custom folder and season number.
+    /// Format: basePath/SanitizedFolder/Season XX/SanitizedFolder - SXXEXX.mkv
+    /// Used when downloading HiAnime episodes into an existing series folder.
+    /// </summary>
+    public static string BuildOutputPathCustom(
+        string basePath, string customFolder, int seasonNumber, int episodeNumber)
+    {
+        var safeName = SanitizeFileName(customFolder);
+        var seasonFolder = $"Season {seasonNumber:D2}";
+        var fileName = $"{safeName} - S{seasonNumber:D2}E{episodeNumber:D2}.mkv";
+        return Path.Combine(basePath, safeName, seasonFolder, fileName);
+    }
+
+    /// <summary>
+    /// Scans a season folder for existing episodes and returns the highest episode number found.
+    /// Returns 0 if the folder doesn't exist or contains no matching files.
+    /// </summary>
+    public static int GetHighestEpisodeNumber(string basePath, string folderName, int seasonNumber)
+    {
+        var safeName = SanitizeFileName(folderName);
+        var seasonFolder = $"Season {seasonNumber:D2}";
+        var seasonPath = Path.Combine(basePath, safeName, seasonFolder);
+
+        if (!Directory.Exists(seasonPath))
+        {
+            return 0;
+        }
+
+        var highest = 0;
+        foreach (var file in Directory.EnumerateFiles(seasonPath, "*.mkv"))
+        {
+            var fileName = Path.GetFileName(file);
+            var match = EpisodeFilePattern.Match(fileName);
+            if (match.Success && int.TryParse(match.Groups["episode"].Value, out var epNum))
+            {
+                if (epNum > highest)
+                {
+                    highest = epNum;
+                }
+            }
+        }
+
+        return highest;
+    }
+
+    /// <summary>
     /// Inserts the episode title into the filename.
     /// Transforms "SeriesName - S01E01.mkv" into "SeriesName - S01E01 - Episode Title.mkv".
     /// </summary>

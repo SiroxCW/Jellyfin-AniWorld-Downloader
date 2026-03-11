@@ -135,7 +135,8 @@ public class DownloadService
         string seriesTitle,
         string source = "aniworld",
         CancellationToken cancellationToken = default,
-        int? episodeNumber = null)
+        int? episodeNumber = null,
+        int? customSeason = null)
     {
         DownloadTask task;
 
@@ -153,6 +154,12 @@ public class DownloadService
 
             var taskId = Guid.NewGuid().ToString("N")[..12];
             var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl, episodeNumber);
+
+            // Override season when a custom season is provided (HiAnime "download to existing title")
+            if (customSeason.HasValue)
+            {
+                season = customSeason.Value;
+            }
 
             task = new DownloadTask
             {

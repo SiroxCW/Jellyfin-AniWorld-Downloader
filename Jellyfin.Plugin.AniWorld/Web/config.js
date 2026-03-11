@@ -23,6 +23,7 @@ export default function (view, params) {
             view.querySelector('#chkHiAnimeEnabled').checked = hi.Enabled !== false;
             view.querySelector('#txtHiAnimeDownloadPath').value = hi.DownloadPath || '';
             view.querySelector('#selHiAnimeLanguage').value = hi.PreferredLanguage || 'sub';
+            view.querySelector('#chkHiAnimeOnlyDub').checked = hi.OnlyEnglishDub === true;
 
             // s.to
             var sto = config.StoConfig || {};
@@ -64,6 +65,7 @@ export default function (view, params) {
             config.HiAnimeConfig.Enabled = view.querySelector('#chkHiAnimeEnabled').checked;
             config.HiAnimeConfig.DownloadPath = view.querySelector('#txtHiAnimeDownloadPath').value.trim();
             config.HiAnimeConfig.PreferredLanguage = view.querySelector('#selHiAnimeLanguage').value;
+            config.HiAnimeConfig.OnlyEnglishDub = view.querySelector('#chkHiAnimeOnlyDub').checked;
 
             // s.to
             if (!config.StoConfig) config.StoConfig = {};

@@ -170,4 +170,7 @@ public class SiteDownloaderConfig
 
     /// <summary>Gets or sets the fallback provider. Empty = use global.</summary>
     public string FallbackProvider { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets whether only English Dub downloads are allowed for HiAnime.</summary>
+    public bool OnlyEnglishDub { get; set; }
 }
