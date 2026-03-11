@@ -70,12 +70,30 @@
                         </div>
 
                         <div class="inputContainer">
-                            <label class="inputLabel" for="txtAniWorldDownloadPath">Download Path</label>
-                            <input is="emby-input" type="text" id="txtAniWorldDownloadPath"
+                            <label class="inputLabel" for="txtAniWorldPath1">Download Path (German Dub)</label>
+                            <input is="emby-input" type="text" id="txtAniWorldPath1"
                                    placeholder="/media/anime" />
                             <div class="fieldDescription">
-                                Base directory for downloaded anime files. Files will be organized as:
-                                <code>DownloadPath/SeriesName/Season XX/SeriesName - SXXEXX.mkv</code>
+                                Base directory for German Dub downloads. Files will be organized as:
+                                <code>Path/SeriesName/Season XX/SeriesName - SXXEXX.mkv</code>
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtAniWorldPath2">Download Path (English Sub)</label>
+                            <input is="emby-input" type="text" id="txtAniWorldPath2"
+                                   placeholder="/media/anime" />
+                            <div class="fieldDescription">
+                                Base directory for English Sub downloads. Leave empty to use the German Dub path.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtAniWorldPath3">Download Path (German Sub)</label>
+                            <input is="emby-input" type="text" id="txtAniWorldPath3"
+                                   placeholder="/media/anime" />
+                            <div class="fieldDescription">
+                                Base directory for German Sub downloads. Leave empty to use the German Dub path.
                             </div>
                         </div>
 
@@ -114,6 +132,16 @@
                                 with this provider.
                             </div>
                         </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkAniWorldOnlyGerman" />
+                                <span>Only allow German Sub and German Dub</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                When enabled, only German Dub and German Sub downloads are allowed for AniWorld. English Sub will be blocked.
+                            </div>
+                        </div>
                     </div>
 
                     <!-- HiAnime Settings -->
@@ -131,10 +159,18 @@
                         </div>
 
                         <div class="inputContainer">
-                            <label class="inputLabel" for="txtHiAnimeDownloadPath">Download Path</label>
-                            <input is="emby-input" type="text" id="txtHiAnimeDownloadPath" placeholder="/media/anime" />
+                            <label class="inputLabel" for="txtHiAnimePathSub">Download Path (English Sub)</label>
+                            <input is="emby-input" type="text" id="txtHiAnimePathSub" placeholder="/media/anime" />
                             <div class="fieldDescription">
-                                Base directory for downloaded anime files. Leave empty to use the AniWorld download path.
+                                Base directory for English Sub downloads. Leave empty to use the AniWorld download path.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtHiAnimePathDub">Download Path (English Dub)</label>
+                            <input is="emby-input" type="text" id="txtHiAnimePathDub" placeholder="/media/anime" />
+                            <div class="fieldDescription">
+                                Base directory for English Dub downloads. Leave empty to use the English Sub path.
                             </div>
                         </div>
 
@@ -173,11 +209,20 @@
                         </div>
 
                         <div class="inputContainer">
-                            <label class="inputLabel" for="txtStoDownloadPath">Download Path</label>
-                            <input is="emby-input" type="text" id="txtStoDownloadPath"
+                            <label class="inputLabel" for="txtStoPath1">Download Path (German Dub)</label>
+                            <input is="emby-input" type="text" id="txtStoPath1"
                                    placeholder="/media/series" />
                             <div class="fieldDescription">
-                                Base directory for downloaded series files. Leave empty to use the AniWorld download path.
+                                Base directory for German Dub downloads.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtStoPath2">Download Path (English Dub)</label>
+                            <input is="emby-input" type="text" id="txtStoPath2"
+                                   placeholder="/media/series" />
+                            <div class="fieldDescription">
+                                Base directory for English Dub downloads. Leave empty to use the German Dub path.
                             </div>
                         </div>
 

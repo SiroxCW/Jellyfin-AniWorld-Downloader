@@ -149,7 +149,8 @@ public class AniWorldController : ControllerBase
             aniworld = config?.AniWorldConfig.Enabled ?? true,
             sto = config?.StoConfig.Enabled ?? false,
             hianime = config?.HiAnimeConfig.Enabled ?? true,
-            hiAnimeOnlyDub = config?.HiAnimeConfig.OnlyEnglishDub ?? false
+            hiAnimeOnlyDub = config?.HiAnimeConfig.OnlyEnglishDub ?? false,
+            aniWorldOnlyGerman = config?.AniWorldConfig.OnlyGermanLanguages ?? false
         });
     }
 
@@ -361,19 +362,27 @@ public class AniWorldController : ControllerBase
     {
         var resolvedSource = string.IsNullOrEmpty(source) ? "hianime" : source;
         var config = Plugin.Instance?.Configuration;
-        var basePath = config?.GetDownloadPath(resolvedSource) ?? string.Empty;
+        var allPaths = config?.GetAllDownloadPaths(resolvedSource) ?? new List<string>();
 
-        if (string.IsNullOrEmpty(basePath) || !Directory.Exists(basePath))
+        var folderSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var basePath in allPaths)
         {
-            return Ok(new List<string>());
+            if (!Directory.Exists(basePath))
+            {
+                continue;
+            }
+
+            foreach (var dir in Directory.GetDirectories(basePath))
+            {
+                var name = Path.GetFileName(dir);
+                if (!string.IsNullOrEmpty(name))
+                {
+                    folderSet.Add(name);
+                }
+            }
         }
 
-        var folders = Directory.GetDirectories(basePath)
-            .Select(Path.GetFileName)
-            .Where(name => !string.IsNullOrEmpty(name))
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
+        var folders = folderSet.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
         return Ok(folders);
     }
 
@@ -400,14 +409,18 @@ public class AniWorldController : ControllerBase
 
         var resolvedSource = string.IsNullOrEmpty(source) ? "hianime" : source;
         var config = Plugin.Instance?.Configuration;
-        var basePath = config?.GetDownloadPath(resolvedSource) ?? string.Empty;
+        var allPaths = config?.GetAllDownloadPaths(resolvedSource) ?? new List<string>();
 
-        if (string.IsNullOrEmpty(basePath))
+        var highest = 0;
+        foreach (var basePath in allPaths)
         {
-            return Ok(new { exists = false, highestEpisode = 0 });
+            var h = PathHelper.GetHighestEpisodeNumber(basePath, folder, season);
+            if (h > highest)
+            {
+                highest = h;
+            }
         }
 
-        var highest = PathHelper.GetHighestEpisodeNumber(basePath, folder, season);
         return Ok(new { exists = highest > 0, highestEpisode = highest });
     }
 
@@ -435,18 +448,26 @@ public class AniWorldController : ControllerBase
 
         var source = ResolveSource(request.Source, request.EpisodeUrl);
         var config = Plugin.Instance?.Configuration;
-        var basePath = config?.GetDownloadPath(source) ?? string.Empty;
+        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
+
+        // Enforce language restrictions — reject blocked languages
+        if (isHiAnime && config?.HiAnimeConfig.OnlyEnglishDub == true && language != "dub")
+        {
+            return BadRequest("Only English Dub downloads are allowed for HiAnime. This language is blocked by the admin.");
+        }
+
+        if (!isHiAnime && string.Equals(source, "aniworld", StringComparison.OrdinalIgnoreCase)
+            && config?.AniWorldConfig.OnlyGermanLanguages == true && language == "2")
+        {
+            return BadRequest("English Sub downloads are blocked for AniWorld. Only German Dub and German Sub are allowed.");
+        }
+
+        var basePath = config?.GetDownloadPath(source, language) ?? string.Empty;
 
         if (string.IsNullOrEmpty(basePath))
         {
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
-        }
-
-        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
-        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
-        if (isHiAnime && config?.HiAnimeConfig.OnlyEnglishDub == true)
-        {
-            language = "dub";
         }
 
         var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
@@ -538,18 +559,26 @@ public class AniWorldController : ControllerBase
 
         var source = ResolveSource(request.Source, request.SeasonUrl);
         var config = Plugin.Instance?.Configuration;
-        var basePath = config?.GetDownloadPath(source) ?? string.Empty;
+        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
+
+        // Enforce language restrictions — reject blocked languages
+        if (isHiAnime && config?.HiAnimeConfig.OnlyEnglishDub == true && language != "dub")
+        {
+            return BadRequest("Only English Dub downloads are allowed for HiAnime. This language is blocked by the admin.");
+        }
+
+        if (!isHiAnime && string.Equals(source, "aniworld", StringComparison.OrdinalIgnoreCase)
+            && config?.AniWorldConfig.OnlyGermanLanguages == true && language == "2")
+        {
+            return BadRequest("English Sub downloads are blocked for AniWorld. Only German Dub and German Sub are allowed.");
+        }
+
+        var basePath = config?.GetDownloadPath(source, language) ?? string.Empty;
 
         if (string.IsNullOrEmpty(basePath))
         {
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
-        }
-
-        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
-        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
-        if (isHiAnime && config?.HiAnimeConfig.OnlyEnglishDub == true)
-        {
-            language = "dub";
         }
 
         var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
@@ -664,18 +693,26 @@ public class AniWorldController : ControllerBase
 
         var source = ResolveSource(request.Source, request.SeriesUrl);
         var config = Plugin.Instance?.Configuration;
-        var basePath = config?.GetDownloadPath(source) ?? string.Empty;
+        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
+
+        // Enforce language restrictions — reject blocked languages
+        if (isHiAnime && config?.HiAnimeConfig.OnlyEnglishDub == true && language != "dub")
+        {
+            return BadRequest("Only English Dub downloads are allowed for HiAnime. This language is blocked by the admin.");
+        }
+
+        if (!isHiAnime && string.Equals(source, "aniworld", StringComparison.OrdinalIgnoreCase)
+            && config?.AniWorldConfig.OnlyGermanLanguages == true && language == "2")
+        {
+            return BadRequest("English Sub downloads are blocked for AniWorld. Only German Dub and German Sub are allowed.");
+        }
+
+        var basePath = config?.GetDownloadPath(source, language) ?? string.Empty;
 
         if (string.IsNullOrEmpty(basePath))
         {
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
-        }
-
-        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
-        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
-        if (isHiAnime && config?.HiAnimeConfig.OnlyEnglishDub == true)
-        {
-            language = "dub";
         }
 
         var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
