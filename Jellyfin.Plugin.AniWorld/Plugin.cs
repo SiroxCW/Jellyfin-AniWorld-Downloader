@@ -29,6 +29,9 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     private const string PluginDisplayName = "AniWorld Downloader";
 
+    private const int FileTransformationMaxRetries = 30;
+    private const int FileTransformationRetryDelayMs = 1000;
+
     private readonly IApplicationPaths _applicationPaths;
 
     /// <summary>
@@ -51,9 +54,9 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             _ = Task.Run(async () =>
             {
                 // Wait for File Transformation to initialize
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < FileTransformationMaxRetries; i++)
                 {
-                    await Task.Delay(1000).ConfigureAwait(false);
+                    await Task.Delay(FileTransformationRetryDelayMs).ConfigureAwait(false);
                     try
                     {
                         if (TryRegisterFileTransformation())
