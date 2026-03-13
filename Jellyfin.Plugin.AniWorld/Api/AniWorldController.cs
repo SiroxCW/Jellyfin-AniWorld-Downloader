@@ -150,7 +150,9 @@ public class AniWorldController : ControllerBase
             sto = config?.StoConfig.Enabled ?? false,
             hianime = config?.HiAnimeConfig.Enabled ?? true,
             hiAnimeOnlyDub = config?.HiAnimeConfig.OnlyEnglishDub ?? false,
-            aniWorldOnlyGerman = config?.AniWorldConfig.OnlyGermanLanguages ?? false
+            aniWorldOnlyGerman = config?.AniWorldConfig.OnlyGermanLanguages ?? false,
+            maintenanceMode = config?.MaintenanceMode ?? false,
+            maintenanceMessage = config?.MaintenanceMessage ?? string.Empty
         });
     }
 
@@ -432,10 +434,18 @@ public class AniWorldController : ControllerBase
     [HttpPost("Download")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<DownloadTask>> StartDownload(
         [FromBody] DownloadRequest request,
         CancellationToken cancellationToken)
     {
+        var maintenanceConfig = Plugin.Instance?.Configuration;
+        if (maintenanceConfig?.MaintenanceMode == true)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                maintenanceConfig.MaintenanceMessage);
+        }
+
         if (string.IsNullOrEmpty(request.EpisodeUrl))
         {
             return BadRequest("Episode URL is required");
@@ -543,10 +553,18 @@ public class AniWorldController : ControllerBase
     [HttpPost("DownloadSeason")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<List<DownloadTask>>> DownloadSeason(
         [FromBody] BatchDownloadRequest request,
         CancellationToken cancellationToken)
     {
+        var maintenanceConfig = Plugin.Instance?.Configuration;
+        if (maintenanceConfig?.MaintenanceMode == true)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                maintenanceConfig.MaintenanceMessage);
+        }
+
         if (string.IsNullOrEmpty(request.SeasonUrl))
         {
             return BadRequest("Season URL is required");
@@ -677,10 +695,18 @@ public class AniWorldController : ControllerBase
     [HttpPost("DownloadAll")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<object>> DownloadAllSeasons(
         [FromBody] FullSeriesDownloadRequest request,
         CancellationToken cancellationToken)
     {
+        var maintenanceConfig = Plugin.Instance?.Configuration;
+        if (maintenanceConfig?.MaintenanceMode == true)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                maintenanceConfig.MaintenanceMessage);
+        }
+
         if (string.IsNullOrEmpty(request.SeriesUrl))
         {
             return BadRequest("Series URL is required");
