@@ -15,7 +15,7 @@ Series View| Search View
 
 - **Search and browse** anime and series with cover art, popular titles, and new releases
 - **Download** individual episodes, full seasons, or entire series
-- **Two sites supported**: aniworld.to (anime) and s.to (series)
+- **Two sites supported**: aniworld.to (anime), s.to (series) and hianime.to (currently disabled)
 - **Multiple languages**: German Dub, German Sub, English Sub (aniworld), German Dub, English Dub (s.to)
 - **Multiple providers**: VOE, Filemoon, Vidoza and Vidmoly
 - **Download manager** with real-time progress, cancel, retry, and batch operations
