@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Mime;
 using System.Reflection;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.AniWorld.Helpers;
@@ -528,6 +529,8 @@ public class AniWorldController : ControllerBase
             outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl, request.EpisodeNumber);
         }
 
+        var username = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
+
         var taskId = await _downloadService.StartDownloadAsync(
             request.EpisodeUrl,
             language,
@@ -537,7 +540,9 @@ public class AniWorldController : ControllerBase
             source,
             cancellationToken,
             effectiveEpisodeNumber,
-            customSeason).ConfigureAwait(false);
+            customSeason,
+            username,
+            request.Priority).ConfigureAwait(false);
 
         if (taskId == null)
         {
@@ -643,6 +648,7 @@ public class AniWorldController : ControllerBase
 
         var tasks = new List<DownloadTask>();
         var offset = useCustomTarget ? (request.EpisodeOffset ?? 0) : 0;
+        var username = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
 
         foreach (var ep in episodes)
         {
@@ -676,7 +682,9 @@ public class AniWorldController : ControllerBase
                 source,
                 cancellationToken,
                 effectiveEpNum,
-                customSeason).ConfigureAwait(false);
+                customSeason,
+                username,
+                request.Priority).ConfigureAwait(false);
 
             if (taskId == null) continue;
 
@@ -784,6 +792,7 @@ public class AniWorldController : ControllerBase
         var allTasks = new List<DownloadTask>();
         var skippedCount = 0;
         var offset = useCustomTarget ? (request.EpisodeOffset ?? 0) : 0;
+        var username = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
 
         foreach (var season in seriesInfo.Seasons)
         {
@@ -831,7 +840,9 @@ public class AniWorldController : ControllerBase
                     source,
                     cancellationToken,
                     effectiveEpNum,
-                    customSeason).ConfigureAwait(false);
+                    customSeason,
+                    username,
+                    request.Priority).ConfigureAwait(false);
 
                 if (taskId == null) { skippedCount++; continue; }
 
@@ -867,7 +878,9 @@ public class AniWorldController : ControllerBase
                     outputPath,
                     seriesTitle,
                     source,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    username: username,
+                    priority: request.Priority).ConfigureAwait(false);
 
                 if (taskId == null) { skippedCount++; continue; }
 
@@ -1158,6 +1171,9 @@ public class DownloadRequest
 
     /// <summary>Gets or sets the episode offset (highest existing episode number to offset from, HiAnime only).</summary>
     public int? EpisodeOffset { get; set; }
+
+    /// <summary>Gets or sets whether this is a priority download (added to front of queue).</summary>
+    public bool Priority { get; set; }
 }
 
 /// <summary>
@@ -1188,6 +1204,9 @@ public class BatchDownloadRequest
 
     /// <summary>Gets or sets the episode offset (highest existing episode number to offset from, HiAnime only).</summary>
     public int? EpisodeOffset { get; set; }
+
+    /// <summary>Gets or sets whether this is a priority download (added to front of queue).</summary>
+    public bool Priority { get; set; }
 }
 
 /// <summary>
@@ -1218,4 +1237,7 @@ public class FullSeriesDownloadRequest
 
     /// <summary>Gets or sets the episode offset (highest existing episode number to offset from, HiAnime only).</summary>
     public int? EpisodeOffset { get; set; }
+
+    /// <summary>Gets or sets whether this is a priority download (added to front of queue).</summary>
+    public bool Priority { get; set; }
 }
