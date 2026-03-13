@@ -41,6 +41,7 @@ public class DownloadService
         new UnboundedChannelOptions { SingleReader = false });
     private readonly object _queueLock = new();
     private long _sequenceCounter;
+    private long _prioritySequenceCounter = long.MinValue;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DownloadService"/> class.
@@ -201,7 +202,9 @@ public class DownloadService
                 Source = source,
                 Status = DownloadStatus.Queued,
                 StartedAt = DateTime.UtcNow,
-                SequenceNumber = Interlocked.Increment(ref _sequenceCounter),
+                SequenceNumber = priority
+                    ? Interlocked.Increment(ref _prioritySequenceCounter)
+                    : Interlocked.Increment(ref _sequenceCounter),
                 MaxRetries = Plugin.Instance?.Configuration.MaxRetries ?? DefaultMaxRetries,
                 Username = username,
             };
