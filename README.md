@@ -9,6 +9,8 @@ Series View| Search View
 :---:|:---:
 ![Series View](screenshots/preview_anime.png) | ![Search View](screenshots/preview_search.png)
 
+> **Note:** HiAnime seems to be discontinued since 13.03.2026, so this provider is currently disabled and will be removed completely if it really gets shut down.
+
 ## Features
 
 - **Search and browse** anime and series with cover art, popular titles, and new releases
