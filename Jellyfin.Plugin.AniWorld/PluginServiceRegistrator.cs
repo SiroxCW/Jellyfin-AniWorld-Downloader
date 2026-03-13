@@ -12,11 +12,11 @@ namespace Jellyfin.Plugin.AniWorld;
 /// </summary>
 public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
+    private const int HttpClientTimeoutSeconds = 50;
+
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        private const int HttpClientTimeoutSeconds = 50;
-        
         serviceCollection.AddHttpClient("AniWorld", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds));
         serviceCollection.AddHttpClient("STO", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds));
         serviceCollection.AddHttpClient("HiAnime", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds));

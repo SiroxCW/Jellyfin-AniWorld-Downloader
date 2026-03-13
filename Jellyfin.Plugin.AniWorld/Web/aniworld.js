@@ -19,7 +19,16 @@ export default function (view, params) {
         if (bytes < 1024) return bytes + ' B';
         if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
         if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        var gb = bytes / (1024 * 1024 * 1024);
+        if (gb < 1024) return gb.toFixed(2) + ' GB';
+        return (gb / 1024).toFixed(2) + ' TB';
+    }
+
+    function formatCount(n) {
+        if (n == null) return '0';
+        if (n < 1000) return String(n);
+        if (n < 1000000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+        return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     }
 
     function formatDate(isoStr) {
@@ -1118,11 +1127,11 @@ export default function (view, params) {
             if (!container) return;
 
             var html = '<div class="aw-stats">';
-            html += '<div class="aw-stat"><div class="aw-stat-value">' + stats.TotalDownloads + '</div><div class="aw-stat-label">Total Downloads</div></div>';
-            html += '<div class="aw-stat"><div class="aw-stat-value green">' + stats.Completed + '</div><div class="aw-stat-label">Completed</div></div>';
-            html += '<div class="aw-stat"><div class="aw-stat-value red">' + stats.Failed + '</div><div class="aw-stat-label">Failed</div></div>';
+            html += '<div class="aw-stat"><div class="aw-stat-value">' + formatCount(stats.TotalDownloads) + '</div><div class="aw-stat-label">Total Downloads</div></div>';
+            html += '<div class="aw-stat"><div class="aw-stat-value green">' + formatCount(stats.Completed) + '</div><div class="aw-stat-label">Completed</div></div>';
+            html += '<div class="aw-stat"><div class="aw-stat-value red">' + formatCount(stats.Failed) + '</div><div class="aw-stat-label">Failed</div></div>';
             html += '<div class="aw-stat"><div class="aw-stat-value">' + formatSize(stats.TotalBytes) + '</div><div class="aw-stat-label">Total Size</div></div>';
-            html += '<div class="aw-stat"><div class="aw-stat-value orange">' + stats.UniqueSeriesCount + '</div><div class="aw-stat-label">Series</div></div>';
+            html += '<div class="aw-stat"><div class="aw-stat-value orange">' + formatCount(stats.UniqueSeriesCount) + '</div><div class="aw-stat-label">Series</div></div>';
             html += '</div>';
             container.innerHTML = html;
         },
