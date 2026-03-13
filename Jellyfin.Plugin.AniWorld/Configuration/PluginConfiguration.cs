@@ -33,6 +33,18 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public bool EnableNonAdminAccess { get; set; } = false;
 
+    /// <summary>
+    /// Gets or sets whether maintenance mode is enabled.
+    /// When enabled, new downloads are blocked and a message is displayed to users.
+    /// Existing queued/active downloads continue to completion.
+    /// </summary>
+    public bool MaintenanceMode { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the message displayed when maintenance mode is active.
+    /// </summary>
+    public string MaintenanceMessage { get; set; } = "The downloader is currently under maintenance and does not accept new downloads at this time.";
+
     // ── Per-site configs ─────────────────────────────────────────
 
     /// <summary>

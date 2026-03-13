@@ -9,6 +9,8 @@ export default function (view, params) {
             view.querySelector('#txtMaxRetries').value = config.MaxRetries != null ? config.MaxRetries : 3;
             view.querySelector('#chkAutoScan').checked = config.AutoScanLibrary !== false;
             view.querySelector('#chkNonAdminAccess').checked = config.EnableNonAdminAccess === true;
+            view.querySelector('#chkMaintenanceMode').checked = config.MaintenanceMode === true;
+            view.querySelector('#txtMaintenanceMessage').value = config.MaintenanceMessage || '';
 
             // AniWorld
             var aw = config.AniWorldConfig || {};
@@ -52,6 +54,8 @@ export default function (view, params) {
             config.MaxRetries = parseInt(view.querySelector('#txtMaxRetries').value, 10) || 0;
             config.AutoScanLibrary = view.querySelector('#chkAutoScan').checked;
             config.EnableNonAdminAccess = view.querySelector('#chkNonAdminAccess').checked;
+            config.MaintenanceMode = view.querySelector('#chkMaintenanceMode').checked;
+            config.MaintenanceMessage = view.querySelector('#txtMaintenanceMessage').value.trim();
 
             // AniWorld
             if (!config.AniWorldConfig) config.AniWorldConfig = {};

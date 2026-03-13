@@ -785,7 +785,16 @@ export default function (view, params) {
         },
 
         // ── Downloads ──
+        _checkMaintenance: function () {
+            if (this.maintenanceMode) {
+                Dashboard.alert('Downloads are blocked: maintenance mode is active.');
+                return true;
+            }
+            return false;
+        },
+
         downloadEpisode: function (encodedUrl, episodeNumber) {
+            if (this._checkMaintenance()) return;
             var url = decodeURIComponent(encodedUrl);
             var langSelect = view.querySelector('#aw-season-lang');
             var lang = (langSelect && langSelect.value) ? langSelect.value : null;
@@ -795,6 +804,7 @@ export default function (view, params) {
         },
 
         downloadWithOptions: function (encodedUrl, langKey, provider, episodeNumber) {
+            if (this._checkMaintenance()) return;
             var url = decodeURIComponent(encodedUrl);
             var customTarget = this._getHiAnimeCustomTarget();
             if (customTarget === false) return;
@@ -802,6 +812,7 @@ export default function (view, params) {
         },
 
         downloadSeason: function (encodedSeasonUrl) {
+            if (this._checkMaintenance()) return;
             var seasonUrl = decodeURIComponent(encodedSeasonUrl);
             var customTarget = this._getHiAnimeCustomTarget();
             if (customTarget === false) return;
@@ -843,6 +854,7 @@ export default function (view, params) {
         },
 
         downloadAllSeasons: function (encodedSeriesUrl) {
+            if (this._checkMaintenance()) return;
             var seriesUrl = decodeURIComponent(encodedSeriesUrl);
             var customTarget = this._getHiAnimeCustomTarget();
             if (customTarget === false) return;
@@ -1243,7 +1255,7 @@ export default function (view, params) {
     // Expose globally for onclick handlers in dynamic HTML
     window.AW = AW;
 
-    // Load HiAnime "only dub" setting from server
+    // Load settings from server (language restrictions + maintenance mode)
     ApiClient.fetch({
         url: ApiClient.getUrl('AniWorld/EnabledSources'),
         type: 'GET',
@@ -1251,6 +1263,15 @@ export default function (view, params) {
     }).then(function (sources) {
         AW.hiAnimeOnlyDub = sources.hiAnimeOnlyDub === true;
         AW.aniWorldOnlyGerman = sources.aniWorldOnlyGerman === true;
+        AW.maintenanceMode = sources.maintenanceMode === true;
+        if (AW.maintenanceMode) {
+            var banner = view.querySelector('#aw-maintenance-banner');
+            var text = view.querySelector('#aw-maintenance-text');
+            if (banner && text) {
+                text.textContent = sources.maintenanceMessage || 'The downloader is currently under maintenance.';
+                banner.style.display = '';
+            }
+        }
     }).catch(function () { /* ignore */ });
 
     // Hide settings button when opened from sidebar (non-admin view)
