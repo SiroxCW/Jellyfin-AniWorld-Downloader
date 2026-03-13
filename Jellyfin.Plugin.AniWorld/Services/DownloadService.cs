@@ -37,6 +37,8 @@ public class DownloadService
     private readonly ConcurrentDictionary<string, DownloadTask> _activeTasks = new();
     private readonly Channel<DownloadTask> _downloadQueue = Channel.CreateUnbounded<DownloadTask>(
         new UnboundedChannelOptions { SingleReader = false });
+    private readonly Channel<DownloadTask> _priorityQueue = Channel.CreateUnbounded<DownloadTask>(
+        new UnboundedChannelOptions { SingleReader = false });
     private readonly object _queueLock = new();
     private long _sequenceCounter;
 
@@ -72,12 +74,35 @@ public class DownloadService
     }
 
     /// <summary>
-    /// Worker loop that processes downloads from the FIFO queue.
+    /// Worker loop that processes downloads from the priority and normal queues.
+    /// Priority queue items are always picked up before normal queue items.
     /// </summary>
     private async Task ProcessDownloadQueueAsync()
     {
-        await foreach (var task in _downloadQueue.Reader.ReadAllAsync().ConfigureAwait(false))
+        while (true)
         {
+            DownloadTask? task = null;
+
+            // Always check priority queue first
+            if (_priorityQueue.Reader.TryRead(out task) || _downloadQueue.Reader.TryRead(out task))
+            {
+                // Got a task
+            }
+            else
+            {
+                // Wait for either channel to have data
+                var priorityWait = _priorityQueue.Reader.WaitToReadAsync().AsTask();
+                var normalWait = _downloadQueue.Reader.WaitToReadAsync().AsTask();
+
+                await Task.WhenAny(priorityWait, normalWait).ConfigureAwait(false);
+
+                // Try priority first again
+                if (!_priorityQueue.Reader.TryRead(out task) && !_downloadQueue.Reader.TryRead(out task))
+                {
+                    continue;
+                }
+            }
+
             try
             {
                 await ExecuteDownloadWithRetryAsync(task, task.CancellationSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
@@ -136,7 +161,9 @@ public class DownloadService
         string source = "aniworld",
         CancellationToken cancellationToken = default,
         int? episodeNumber = null,
-        int? customSeason = null)
+        int? customSeason = null,
+        string? username = null,
+        bool priority = false)
     {
         DownloadTask task;
 
@@ -176,6 +203,7 @@ public class DownloadService
                 StartedAt = DateTime.UtcNow,
                 SequenceNumber = Interlocked.Increment(ref _sequenceCounter),
                 MaxRetries = Plugin.Instance?.Configuration.MaxRetries ?? DefaultMaxRetries,
+                Username = username,
             };
 
             task.CancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -185,8 +213,15 @@ public class DownloadService
         // Persist initial state to SQLite
         _historyService.SaveDownload(task, task.SeriesTitle, task.Season, task.Episode);
 
-        // Enqueue for FIFO processing by worker tasks
-        await _downloadQueue.Writer.WriteAsync(task, cancellationToken).ConfigureAwait(false);
+        // Enqueue: priority downloads go to the front of the line
+        if (priority)
+        {
+            await _priorityQueue.Writer.WriteAsync(task, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await _downloadQueue.Writer.WriteAsync(task, cancellationToken).ConfigureAwait(false);
+        }
 
         return task.Id;
     }
@@ -982,6 +1017,9 @@ public class DownloadTask
 
     /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
     public string Source { get; set; } = "aniworld";
+
+    /// <summary>Gets or sets the username of the user who queued the download.</summary>
+    public string? Username { get; set; }
 
     /// <summary>Gets or sets the insertion order for stable sorting.</summary>
     [JsonIgnore]

@@ -499,6 +499,7 @@ export default function (view, params) {
                 bar += '<select id="aw-season-lang" class="aw-lang-select" title="Language for downloads">';
                 bar += getLangOptionsHtml(source);
                 bar += '</select>';
+                bar += '<label style="display:inline-flex;align-items:center;gap:0.3em;font-size:0.82em;cursor:pointer;opacity:0.85" title="Priority downloads are added to the front of the queue"><input type="checkbox" id="aw-priority-cb" style="cursor:pointer"> Priority</label>';
                 bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')">\u2B07\uFE0F Download Season</button>';
                 if (AW.currentSeriesUrl && source !== 'hianime') {
                     bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')">\u2B07\uFE0F Download All Seasons</button>';
@@ -794,6 +795,11 @@ export default function (view, params) {
         },
 
         // ── Downloads ──
+        _isPriorityChecked: function () {
+            var cb = view.querySelector('#aw-priority-cb');
+            return cb ? cb.checked : false;
+        },
+
         _checkMaintenance: function () {
             if (this.maintenanceMode) {
                 Dashboard.alert('Downloads are blocked: maintenance mode is active.');
@@ -831,6 +837,8 @@ export default function (view, params) {
                 SeriesTitle: this.currentSeriesTitle,
                 Source: this.currentSeriesSource || 'aniworld'
             };
+
+            if (this._isPriorityChecked()) body.Priority = true;
 
             if (customTarget) {
                 body.CustomFolder = customTarget.folder;
@@ -874,6 +882,8 @@ export default function (view, params) {
                 Source: this.currentSeriesSource || 'aniworld'
             };
 
+            if (this._isPriorityChecked()) body.Priority = true;
+
             if (customTarget) {
                 body.CustomFolder = customTarget.folder;
                 body.CustomSeason = customTarget.season;
@@ -916,6 +926,7 @@ export default function (view, params) {
             if (langKey) body.LanguageKey = langKey;
             if (provider) body.Provider = provider;
             if (episodeNumber != null) body.EpisodeNumber = episodeNumber;
+            if (this._isPriorityChecked()) body.Priority = true;
             if (customTarget) {
                 body.CustomFolder = customTarget.folder;
                 body.CustomSeason = customTarget.season;
@@ -1016,7 +1027,12 @@ export default function (view, params) {
                 html += '<div class="aw-dl-item">';
                 html += '<div class="aw-dl-info">';
                 html += '<strong><img class="aw-source-logo" src="' + siteLogoUrl(dlSource) + '" onerror="this.style.display=\'none\'" style="height:1em"> ' + esc(dl.EpisodeTitle || fileName) + '</strong>';
-                html += '<small>' + esc(dl.Provider) + ' \u00B7 ' + esc(dl.Status);
+                var langNames = getLangNames(dlSource);
+                var langLabel = langNames[dl.Language] || dl.Language || '';
+                var metaParts = [esc(dl.Provider)];
+                if (langLabel) metaParts.push(esc(langLabel));
+                if (dl.Username) metaParts.push(esc(dl.Username));
+                html += '<small>' + metaParts.join(' \u00B7 ');
                 if (dl.RetryCount > 0) {
                     html += ' (retry ' + dl.RetryCount + '/' + dl.MaxRetries + ')';
                 }
