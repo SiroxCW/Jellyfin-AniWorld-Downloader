@@ -69,9 +69,10 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>
     /// Gets or sets the HiAnime (hianime.to) downloader configuration.
     /// </summary>
+    // NOTE: HiAnime (hianime.to) has been shut down. Config is kept for potential future use.
     public SiteDownloaderConfig HiAnimeConfig { get; set; } = new()
     {
-        Enabled = true,
+        Enabled = false,
         PreferredLanguage = "sub",
     };
 

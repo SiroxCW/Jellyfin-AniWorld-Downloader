@@ -148,7 +148,8 @@ public class AniWorldController : ControllerBase
         {
             aniworld = config?.AniWorldConfig.Enabled ?? true,
             sto = config?.StoConfig.Enabled ?? false,
-            hianime = config?.HiAnimeConfig.Enabled ?? true,
+            // NOTE: HiAnime (hianime.to) has been shut down — always disabled
+            hianime = false,
             hiAnimeOnlyDub = config?.HiAnimeConfig.OnlyEnglishDub ?? false,
             aniWorldOnlyGerman = config?.AniWorldConfig.OnlyGermanLanguages ?? false,
             maintenanceMode = config?.MaintenanceMode ?? false,
@@ -240,7 +241,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
@@ -268,7 +269,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
@@ -296,7 +297,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
@@ -453,7 +454,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.EpisodeUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.EpisodeUrl);
@@ -572,7 +573,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.SeasonUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.SeasonUrl);
@@ -714,7 +715,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.SeriesUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.SeriesUrl);
@@ -1006,7 +1007,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
         var completedLanguages = _historyService.GetCompletedLanguages(url);

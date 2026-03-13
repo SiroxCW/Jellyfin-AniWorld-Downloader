@@ -11,7 +11,8 @@ public static class UrlValidator
     {
         "aniworld.to", "www.aniworld.to",
         "s.to", "www.s.to",
-        "hianime.to", "www.hianime.to",
+        // NOTE: HiAnime (hianime.to) has been shut down (March 2026) — removed from allowlist
+        // "hianime.to", "www.hianime.to",
     };
 
     /// <summary>
@@ -57,7 +58,7 @@ public static class UrlValidator
         if (!IsValidUrl(url))
         {
             throw new ArgumentException(
-                "Invalid URL. Only https://aniworld.to, https://s.to, and https://hianime.to URLs are accepted.", paramName);
+                "Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.", paramName);
         }
     }
 
