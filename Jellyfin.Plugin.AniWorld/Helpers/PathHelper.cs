@@ -48,21 +48,15 @@ public static class PathHelper
     /// </summary>
     public static string SanitizeFileName(string name)
     {
-        // Normalize unicode typography to ASCII equivalents
+        // Normalize unicode dashes to hyphens, ellipsis to dot
         var normalized = name
-            .Replace('\u2018', '\'')  // LEFT SINGLE QUOTATION MARK → apostrophe
-            .Replace('\u2019', '\'')  // RIGHT SINGLE QUOTATION MARK → apostrophe
-            .Replace('\u201A', '\'')  // SINGLE LOW-9 QUOTATION MARK → apostrophe
-            .Replace("\u201C", string.Empty)  // LEFT DOUBLE QUOTATION MARK → remove
-            .Replace("\u201D", string.Empty)  // RIGHT DOUBLE QUOTATION MARK → remove
             .Replace('\u2013', '-')   // EN DASH → hyphen
             .Replace('\u2014', '-')   // EM DASH → hyphen
             .Replace('\u2026', '.');  // HORIZONTAL ELLIPSIS → period
 
-        var invalid = Path.GetInvalidFileNameChars();
-        var extraInvalid = new[] { ':', '?', '!', '*', '"', '<', '>', '|', '[', ']' };
+        // Allowlist: keep only Unicode letters, digits, space, dot, underscore, hyphen
         var sanitized = new string(normalized
-            .Where(c => !invalid.Contains(c) && !extraInvalid.Contains(c))
+            .Where(c => char.IsLetterOrDigit(c) || c == ' ' || c == '.' || c == '_' || c == '-')
             .ToArray());
 
         // Collapse multiple spaces/dashes, trim trailing punctuation
