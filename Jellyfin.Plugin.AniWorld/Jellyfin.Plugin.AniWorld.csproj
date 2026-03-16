@@ -6,10 +6,10 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RootNamespace>Jellyfin.Plugin.AniWorld</RootNamespace>
-    <AssemblyVersion>1.5.0.0</AssemblyVersion>
-    <FileVersion>1.5.0.0</FileVersion>
-    <Version>1.5.0.0</Version>
-    <InformationalVersion>1.5.0.0</InformationalVersion>
+    <AssemblyVersion>1.5.1.0</AssemblyVersion>
+    <FileVersion>1.5.1.0</FileVersion>
+    <Version>1.5.1.0</Version>
+    <InformationalVersion>1.5.1.0</InformationalVersion>
     <Authors>SiroxCW</Authors>
     <Company>SiroxCW</Company>
     <Product>AniWorld Downloader</Product>
