@@ -603,7 +603,7 @@ export default function (view, params) {
         checkIsDownloaded: function (url, epId) {
             var source = this.currentSeriesSource || 'aniworld';
             ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/IsDownloaded', { url: url }),
+                url: ApiClient.getUrl('AniWorld/IsDownloaded', { url: url, title: this.currentSeriesTitle || 'Unknown' }),
                 type: 'GET',
                 dataType: 'json'
             }).then(function (result) {
