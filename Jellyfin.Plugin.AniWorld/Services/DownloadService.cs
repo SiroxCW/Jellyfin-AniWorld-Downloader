@@ -919,36 +919,11 @@ public class DownloadService
 
     private string? FindFfmpeg()
     {
-        // Use Jellyfin's own ffmpeg path — works on all platforms
+        // Use Jellyfin's own ffmpeg path — works on all platforms.
+        // EncoderPath may be a full path or just "ffmpeg" (bare name on PATH).
+        // Jellyfin already validated it at startup, so trust it if non-empty.
         var encoderPath = _mediaEncoder.EncoderPath;
-        if (!string.IsNullOrEmpty(encoderPath) && File.Exists(encoderPath))
-        {
-            return encoderPath;
-        }
-
-        // Fallback: search common paths
-        var paths = OperatingSystem.IsWindows()
-            ? new[]
-            {
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Jellyfin", "Server", "ffmpeg.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "jellyfin", "server", "ffmpeg.exe"),
-            }
-            : new[]
-            {
-                "/usr/lib/jellyfin-ffmpeg/ffmpeg",
-                "/usr/bin/ffmpeg",
-                "/usr/local/bin/ffmpeg",
-            };
-
-        foreach (var path in paths)
-        {
-            if (File.Exists(path))
-            {
-                return path;
-            }
-        }
-
-        return null;
+        return string.IsNullOrEmpty(encoderPath) ? null : encoderPath;
     }
 }
 
