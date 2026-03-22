@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Jellyfin.Plugin.AniWorld.Helpers;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -69,6 +70,7 @@ public class DownloadHistoryService : IDisposable
             CREATE INDEX IF NOT EXISTS idx_dh_status ON download_history(status);
             CREATE INDEX IF NOT EXISTS idx_dh_series ON download_history(series_title);
             CREATE INDEX IF NOT EXISTS idx_dh_started ON download_history(started_at);
+            CREATE INDEX IF NOT EXISTS idx_dh_title_season_ep ON download_history(series_title, season, episode);
         ";
         cmd.ExecuteNonQuery();
 
@@ -107,6 +109,7 @@ public class DownloadHistoryService : IDisposable
         {
             try
             {
+                var sanitizedTitle = PathHelper.SanitizeFileName(seriesTitle);
                 using var cmd = _db.CreateCommand();
                 cmd.CommandText = @"
                     INSERT OR REPLACE INTO download_history
@@ -120,7 +123,7 @@ public class DownloadHistoryService : IDisposable
                 ";
                 cmd.Parameters.AddWithValue("@id", task.Id);
                 cmd.Parameters.AddWithValue("@url", task.EpisodeUrl);
-                cmd.Parameters.AddWithValue("@series", seriesTitle);
+                cmd.Parameters.AddWithValue("@series", sanitizedTitle);
                 cmd.Parameters.AddWithValue("@epTitle", task.EpisodeTitle ?? string.Empty);
                 cmd.Parameters.AddWithValue("@season", season);
                 cmd.Parameters.AddWithValue("@episode", episode);
@@ -195,19 +198,24 @@ public class DownloadHistoryService : IDisposable
 
     /// <summary>
     /// Checks if an episode has already been completed for a specific language.
+    /// Matches by sanitized series title + season + episode + language.
     /// </summary>
-    public bool IsAlreadyDownloaded(string episodeUrl, string language)
+    public bool IsAlreadyDownloaded(string seriesTitle, int season, int episode, string language)
     {
         lock (_dbLock)
         {
             try
             {
+                var sanitizedTitle = PathHelper.SanitizeFileName(seriesTitle);
                 using var cmd = _db.CreateCommand();
                 cmd.CommandText = @"
                     SELECT COUNT(1) FROM download_history
-                    WHERE episode_url = @url AND language = @lang AND status = 'Completed'
+                    WHERE series_title = @title AND season = @season AND episode = @ep
+                      AND language = @lang AND status = 'Completed'
                 ";
-                cmd.Parameters.AddWithValue("@url", episodeUrl);
+                cmd.Parameters.AddWithValue("@title", sanitizedTitle);
+                cmd.Parameters.AddWithValue("@season", season);
+                cmd.Parameters.AddWithValue("@ep", episode);
                 cmd.Parameters.AddWithValue("@lang", language);
 
                 var result = cmd.ExecuteScalar();
@@ -215,7 +223,8 @@ public class DownloadHistoryService : IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
+                _logger.LogError(ex, "Failed to check download history for {Title} S{Season}E{Episode}",
+                    seriesTitle, season, episode);
                 return false;
             }
         }
@@ -223,28 +232,34 @@ public class DownloadHistoryService : IDisposable
 
     /// <summary>
     /// Returns the language of the most recent completed download for this episode.
+    /// Matches by sanitized series title + season + episode.
     /// </summary>
-    public string? GetCompletedLanguage(string episodeUrl)
+    public string? GetCompletedLanguage(string seriesTitle, int season, int episode)
     {
         lock (_dbLock)
         {
             try
             {
+                var sanitizedTitle = PathHelper.SanitizeFileName(seriesTitle);
                 using var cmd = _db.CreateCommand();
                 cmd.CommandText = @"
                     SELECT language FROM download_history
-                    WHERE episode_url = @url AND status = 'Completed'
+                    WHERE series_title = @title AND season = @season AND episode = @ep
+                      AND status = 'Completed'
                     ORDER BY completed_at DESC
                     LIMIT 1
                 ";
-                cmd.Parameters.AddWithValue("@url", episodeUrl);
+                cmd.Parameters.AddWithValue("@title", sanitizedTitle);
+                cmd.Parameters.AddWithValue("@season", season);
+                cmd.Parameters.AddWithValue("@ep", episode);
 
                 var result = cmd.ExecuteScalar();
                 return result as string;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
+                _logger.LogError(ex, "Failed to check download history for {Title} S{Season}E{Episode}",
+                    seriesTitle, season, episode);
                 return null;
             }
         }
@@ -252,19 +267,24 @@ public class DownloadHistoryService : IDisposable
 
     /// <summary>
     /// Returns all distinct languages for which this episode has been successfully downloaded.
+    /// Matches by sanitized series title + season + episode.
     /// </summary>
-    public List<string> GetCompletedLanguages(string episodeUrl)
+    public List<string> GetCompletedLanguages(string seriesTitle, int season, int episode)
     {
         lock (_dbLock)
         {
             try
             {
+                var sanitizedTitle = PathHelper.SanitizeFileName(seriesTitle);
                 using var cmd = _db.CreateCommand();
                 cmd.CommandText = @"
                     SELECT DISTINCT language FROM download_history
-                    WHERE episode_url = @url AND status = 'Completed'
+                    WHERE series_title = @title AND season = @season AND episode = @ep
+                      AND status = 'Completed'
                 ";
-                cmd.Parameters.AddWithValue("@url", episodeUrl);
+                cmd.Parameters.AddWithValue("@title", sanitizedTitle);
+                cmd.Parameters.AddWithValue("@season", season);
+                cmd.Parameters.AddWithValue("@ep", episode);
 
                 var languages = new List<string>();
                 using var reader = cmd.ExecuteReader();
@@ -281,7 +301,8 @@ public class DownloadHistoryService : IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to check download history for {Url}", episodeUrl);
+                _logger.LogError(ex, "Failed to check download history for {Title} S{Season}E{Episode}",
+                    seriesTitle, season, episode);
                 return new List<string>();
             }
         }
@@ -478,6 +499,176 @@ public class DownloadHistoryService : IDisposable
             {
                 _logger.LogError(ex, "Failed to delete history record {Id}", id);
                 return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns all completed download records (used by rebuild task to preserve URLs).
+    /// </summary>
+    public List<DownloadHistoryRecord> GetAllCompletedRecords()
+    {
+        var records = new List<DownloadHistoryRecord>();
+        lock (_dbLock)
+        {
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT id, episode_url, series_title, episode_title, season, episode,
+                           provider, language, output_path, status, progress,
+                           file_size_bytes, error, retry_count, started_at, completed_at, source
+                    FROM download_history
+                    WHERE status = 'Completed'
+                ";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    records.Add(new DownloadHistoryRecord
+                    {
+                        Id = reader.GetString(0),
+                        EpisodeUrl = reader.GetString(1),
+                        SeriesTitle = reader.GetString(2),
+                        EpisodeTitle = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        Season = reader.GetInt32(4),
+                        Episode = reader.GetInt32(5),
+                        Provider = reader.GetString(6),
+                        Language = reader.GetString(7),
+                        OutputPath = reader.GetString(8),
+                        Status = reader.GetString(9),
+                        Progress = reader.GetInt32(10),
+                        FileSizeBytes = reader.GetInt64(11),
+                        Error = reader.IsDBNull(12) ? null : reader.GetString(12),
+                        RetryCount = reader.GetInt32(13),
+                        StartedAt = reader.GetString(14),
+                        CompletedAt = reader.IsDBNull(15) ? null : reader.GetString(15),
+                        Source = reader.IsDBNull(16) ? "aniworld" : reader.GetString(16),
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get all completed records");
+            }
+        }
+
+        return records;
+    }
+
+    /// <summary>
+    /// Deletes all completed records from the database.
+    /// </summary>
+    public int DeleteAllCompleted()
+    {
+        lock (_dbLock)
+        {
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = "DELETE FROM download_history WHERE status = 'Completed'";
+                var count = cmd.ExecuteNonQuery();
+                _logger.LogInformation("Deleted {Count} completed download records", count);
+                return count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete completed records");
+                return 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Inserts a synthetic completed record for a file found on disk during rebuild.
+    /// </summary>
+    public void InsertFileRecord(
+        string episodeUrl,
+        string seriesTitle,
+        int season,
+        int episode,
+        string language,
+        string outputPath,
+        long fileSizeBytes,
+        string source)
+    {
+        lock (_dbLock)
+        {
+            try
+            {
+                var id = Guid.NewGuid().ToString("N")[..12];
+                var now = DateTime.UtcNow.ToString("o");
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT OR IGNORE INTO download_history
+                        (id, episode_url, series_title, episode_title, season, episode,
+                         provider, language, output_path, status, progress,
+                         file_size_bytes, error, retry_count, max_retries,
+                         started_at, completed_at, source)
+                    VALUES
+                        (@id, @url, @series, '', @season, @episode,
+                         'disk-scan', @language, @path, 'Completed', 100,
+                         @size, NULL, 0, 0,
+                         @now, @now, @source)
+                ";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@url", episodeUrl);
+                cmd.Parameters.AddWithValue("@series", seriesTitle);
+                cmd.Parameters.AddWithValue("@season", season);
+                cmd.Parameters.AddWithValue("@episode", episode);
+                cmd.Parameters.AddWithValue("@language", language);
+                cmd.Parameters.AddWithValue("@path", outputPath);
+                cmd.Parameters.AddWithValue("@size", fileSizeBytes);
+                cmd.Parameters.AddWithValue("@now", now);
+                cmd.Parameters.AddWithValue("@source", source);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to insert file record for {Path}", outputPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Re-inserts a previously existing completed record (preserving the original episode URL).
+    /// </summary>
+    public void ReinsertRecord(DownloadHistoryRecord record, long currentFileSize)
+    {
+        lock (_dbLock)
+        {
+            try
+            {
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT OR IGNORE INTO download_history
+                        (id, episode_url, series_title, episode_title, season, episode,
+                         provider, language, output_path, status, progress,
+                         file_size_bytes, error, retry_count, max_retries,
+                         started_at, completed_at, source)
+                    VALUES
+                        (@id, @url, @series, @epTitle, @season, @episode,
+                         @provider, @language, @path, 'Completed', 100,
+                         @size, NULL, 0, 0,
+                         @started, @completed, @source)
+                ";
+                cmd.Parameters.AddWithValue("@id", record.Id);
+                cmd.Parameters.AddWithValue("@url", record.EpisodeUrl);
+                cmd.Parameters.AddWithValue("@series", PathHelper.SanitizeFileName(record.SeriesTitle));
+                cmd.Parameters.AddWithValue("@epTitle", record.EpisodeTitle ?? string.Empty);
+                cmd.Parameters.AddWithValue("@season", record.Season);
+                cmd.Parameters.AddWithValue("@episode", record.Episode);
+                cmd.Parameters.AddWithValue("@provider", record.Provider);
+                cmd.Parameters.AddWithValue("@language", record.Language);
+                cmd.Parameters.AddWithValue("@path", record.OutputPath);
+                cmd.Parameters.AddWithValue("@size", currentFileSize);
+                cmd.Parameters.AddWithValue("@started", record.StartedAt);
+                cmd.Parameters.AddWithValue("@completed", record.CompletedAt ?? DateTime.UtcNow.ToString("o"));
+                cmd.Parameters.AddWithValue("@source", record.Source);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to re-insert record for {Path}", record.OutputPath);
             }
         }
     }

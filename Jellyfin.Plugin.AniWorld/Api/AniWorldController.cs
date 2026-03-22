@@ -505,12 +505,6 @@ public class AniWorldController : ControllerBase
             }
         }
 
-        // Check if already downloaded (duplicate detection)
-        if (!request.Force && _downloadService.IsAlreadyDownloaded(request.EpisodeUrl, language))
-        {
-            return BadRequest("This episode has already been downloaded in this language.");
-        }
-
         string outputPath;
         int? effectiveEpisodeNumber = request.EpisodeNumber;
         int? customSeason = null;
@@ -527,6 +521,19 @@ public class AniWorldController : ControllerBase
         else
         {
             outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl, request.EpisodeNumber);
+        }
+
+        // Check if already downloaded (duplicate detection)
+        if (!request.Force)
+        {
+            var (checkSeason, checkEpisode) = useCustomTarget
+                ? (request.CustomSeason!.Value, (request.EpisodeNumber ?? 1) + (request.EpisodeOffset ?? 0))
+                : PathHelper.ParseSeasonEpisode(request.EpisodeUrl, request.EpisodeNumber);
+
+            if (_downloadService.IsAlreadyDownloaded(seriesTitle, checkSeason, checkEpisode, language))
+            {
+                return BadRequest("This episode has already been downloaded in this language.");
+            }
         }
 
         var username = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
@@ -668,7 +675,12 @@ public class AniWorldController : ControllerBase
                 outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url, effectiveEpNum);
             }
 
-            if (_downloadService.IsAlreadyDownloaded(ep.Url, language))
+            var (checkSeason, checkEpisode) = useCustomTarget
+                ? (request.CustomSeason!.Value, ep.Number + offset)
+                : PathHelper.ParseSeasonEpisode(ep.Url, effectiveEpNum);
+            var checkTitle = useCustomTarget ? request.CustomFolder! : seriesTitle;
+
+            if (_downloadService.IsAlreadyDownloaded(checkTitle, checkSeason, checkEpisode, language))
             {
                 continue;
             }
@@ -825,7 +837,12 @@ public class AniWorldController : ControllerBase
                     outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url, effectiveEpNum);
                 }
 
-                if (_downloadService.IsAlreadyDownloaded(ep.Url, language))
+                var (checkSeason, checkEpisode) = useCustomTarget
+                    ? (request.CustomSeason!.Value, ep.Number + offset)
+                    : PathHelper.ParseSeasonEpisode(ep.Url, effectiveEpNum);
+                var checkTitle = useCustomTarget ? request.CustomFolder! : seriesTitle;
+
+                if (_downloadService.IsAlreadyDownloaded(checkTitle, checkSeason, checkEpisode, language))
                 {
                     skippedCount++;
                     continue;
@@ -865,7 +882,9 @@ public class AniWorldController : ControllerBase
             {
                 var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
 
-                if (_downloadService.IsAlreadyDownloaded(ep.Url, language))
+                var (movieSeason, movieEpisode) = PathHelper.ParseSeasonEpisode(ep.Url);
+
+                if (_downloadService.IsAlreadyDownloaded(seriesTitle, movieSeason, movieEpisode, language))
                 {
                     skippedCount++;
                     continue;
@@ -1016,14 +1035,15 @@ public class AniWorldController : ControllerBase
     [HttpGet("IsDownloaded")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult<object> CheckIsDownloaded([Required] string url, string? language = null)
+    public ActionResult<object> CheckIsDownloaded([Required] string url, [Required] string title, string? language = null)
     {
         if (!UrlValidator.IsValidUrl(url))
         {
             return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
         }
 
-        var completedLanguages = _historyService.GetCompletedLanguages(url);
+        var (season, episode) = PathHelper.ParseSeasonEpisode(url);
+        var completedLanguages = _historyService.GetCompletedLanguages(title, season, episode);
         return Ok(new { downloaded = completedLanguages.Count > 0, languages = completedLanguages, url });
     }
 

@@ -148,10 +148,11 @@ public class DownloadService
 
     /// <summary>
     /// Checks whether an episode has already been successfully downloaded.
+    /// Matches by sanitized series title + season + episode + language.
     /// </summary>
-    public bool IsAlreadyDownloaded(string episodeUrl, string language)
+    public bool IsAlreadyDownloaded(string seriesTitle, int season, int episode, string language)
     {
-        return _historyService.IsAlreadyDownloaded(episodeUrl, language);
+        return _historyService.IsAlreadyDownloaded(seriesTitle, season, episode, language);
     }
 
     /// <summary>
