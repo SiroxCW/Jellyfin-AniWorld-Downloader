@@ -147,4 +147,4 @@ Non-admin users will see an **AniWorld Downloader** entry in the sidebar that op
 
 ## License
 
-MIT
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
