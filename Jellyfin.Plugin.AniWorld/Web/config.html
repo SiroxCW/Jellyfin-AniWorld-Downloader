@@ -71,6 +71,17 @@
                                    placeholder="The downloader is currently under maintenance..." />
                             <div class="fieldDescription">Message displayed to users when maintenance mode is active.</div>
                         </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtProxyUrl">Proxy Server</label>
+                            <input is="emby-input" type="text" id="txtProxyUrl"
+                                   placeholder="http://proxy:8080" />
+                            <div class="fieldDescription">
+                                HTTP proxy for all network requests and downloads (e.g. <code>http://proxy:8080</code> or <code>socks5://proxy:1080</code>).
+                                Leave empty to connect directly without a proxy.
+                                <strong>A server restart is required after changing this setting.</strong>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- AniWorld Settings -->
