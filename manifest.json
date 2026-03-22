@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.5.2.0",
+        "changelog": "v1.5.2.0\n- Fix: ffmpeg not found on Windows servers \u2014 now uses Jellyfin's own ffmpeg path via IMediaEncoder with fallback to platform-specific search",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.5.2.0/jellyfin-aniworld-downloader-v1.5.2.0.zip",
+        "checksum": "fff726a0f733c2ab41c0c21b93108f7e",
+        "timestamp": "2026-03-22T01:11:01Z"
+      },
+      {
         "version": "1.5.1.0",
         "changelog": "v1.5.1.0\n- Feature: Maintenance mode to block users from adding episodes to queue\n- Feature: Priority queueing for downloads\n- Feature: Display user and language for queue elements\n- Feature: Better formatted statistics in history view\n- Fix: Priority queue not properly displaying in the UI\n- Fix: Disabled HiAnime support (service discontinuing)\n- Fix: Removed bad symbols from filenames\n- Fix: Build error from misplaced constant declaration\n- Code cleanup: Extracted magic numbers into named constants",
         "targetAbi": "10.9.0.0",
