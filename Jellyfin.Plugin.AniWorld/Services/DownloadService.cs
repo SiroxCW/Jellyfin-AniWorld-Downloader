@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.AniWorld.Extractors;
 using Jellyfin.Plugin.AniWorld.Helpers;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.MediaEncoding;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AniWorld.Services;
@@ -32,6 +33,7 @@ public class DownloadService
     private readonly HiAnimeService _hiAnimeService;
     private readonly DownloadHistoryService _historyService;
     private readonly IEnumerable<IStreamExtractor> _extractors;
+    private readonly IMediaEncoder _mediaEncoder;
     private readonly ILibraryMonitor _libraryMonitor;
     private readonly ILogger<DownloadService> _logger;
     private readonly ConcurrentDictionary<string, DownloadTask> _activeTasks = new();
@@ -52,6 +54,7 @@ public class DownloadService
         HiAnimeService hiAnimeService,
         DownloadHistoryService historyService,
         IEnumerable<IStreamExtractor> extractors,
+        IMediaEncoder mediaEncoder,
         ILibraryMonitor libraryMonitor,
         ILogger<DownloadService> logger)
     {
@@ -60,6 +63,7 @@ public class DownloadService
         _hiAnimeService = hiAnimeService;
         _historyService = historyService;
         _extractors = extractors;
+        _mediaEncoder = mediaEncoder;
         _libraryMonitor = libraryMonitor;
         _logger = logger;
 
@@ -913,14 +917,28 @@ public class DownloadService
         }
     }
 
-    private static string? FindFfmpeg()
+    private string? FindFfmpeg()
     {
-        var paths = new[]
+        // Use Jellyfin's own ffmpeg path — works on all platforms
+        var encoderPath = _mediaEncoder.EncoderPath;
+        if (!string.IsNullOrEmpty(encoderPath) && File.Exists(encoderPath))
         {
-            "/usr/lib/jellyfin-ffmpeg/ffmpeg",
-            "/usr/bin/ffmpeg",
-            "/usr/local/bin/ffmpeg",
-        };
+            return encoderPath;
+        }
+
+        // Fallback: search common paths
+        var paths = OperatingSystem.IsWindows()
+            ? new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Jellyfin", "Server", "ffmpeg.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "jellyfin", "server", "ffmpeg.exe"),
+            }
+            : new[]
+            {
+                "/usr/lib/jellyfin-ffmpeg/ffmpeg",
+                "/usr/bin/ffmpeg",
+                "/usr/local/bin/ffmpeg",
+            };
 
         foreach (var path in paths)
         {
@@ -928,31 +946,6 @@ public class DownloadService
             {
                 return path;
             }
-        }
-
-        try
-        {
-            var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = "which",
-                Arguments = "ffmpeg",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-            });
-
-            if (process != null)
-            {
-                var result = process.StandardOutput.ReadToEnd().Trim();
-                process.WaitForExit();
-                if (!string.IsNullOrEmpty(result) && File.Exists(result))
-                {
-                    return result;
-                }
-            }
-        }
-        catch
-        {
-            // Ignore
         }
 
         return null;
