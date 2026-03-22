@@ -11,6 +11,7 @@ public static class UrlValidator
     {
         "aniworld.to", "www.aniworld.to",
         "s.to", "www.s.to",
+        "serienstream.to", "www.serienstream.to",
         // NOTE: HiAnime (hianime.to) has been shut down (March 2026) — removed from allowlist
         // "hianime.to", "www.hianime.to",
     };
@@ -31,8 +32,18 @@ public static class UrlValidator
             return false;
         }
 
-        // Only allow HTTPS
-        if (uri.Scheme != Uri.UriSchemeHttps)
+        // Validate scheme (HTTPS required, unless custom base URL uses HTTP)
+        var customBaseUrl = Plugin.Instance?.Configuration?.StoBaseUrl;
+        var allowHttp = false;
+        string? customHost = null;
+
+        if (!string.IsNullOrWhiteSpace(customBaseUrl) && Uri.TryCreate(customBaseUrl, UriKind.Absolute, out var customUri))
+        {
+            customHost = customUri.Host.ToLowerInvariant();
+            allowHttp = customUri.Scheme == Uri.UriSchemeHttp;
+        }
+
+        if (uri.Scheme != Uri.UriSchemeHttps && !(allowHttp && uri.Scheme == Uri.UriSchemeHttp))
         {
             return false;
         }
@@ -45,6 +56,12 @@ public static class UrlValidator
             {
                 return true;
             }
+        }
+
+        // Also allow the custom s.to base URL host
+        if (customHost != null && host == customHost)
+        {
+            return true;
         }
 
         return false;
@@ -73,10 +90,19 @@ public static class UrlValidator
             return "aniworld";
         }
 
+        // Get custom s.to host for matching
+        string? customStoHost = null;
+        var customBaseUrl = Plugin.Instance?.Configuration?.StoBaseUrl;
+        if (!string.IsNullOrWhiteSpace(customBaseUrl) && Uri.TryCreate(customBaseUrl, UriKind.Absolute, out var customUri))
+        {
+            customStoHost = customUri.Host.ToLowerInvariant();
+        }
+
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             var host = uri.Host.ToLowerInvariant();
-            if (host == "s.to" || host == "www.s.to")
+            if (host == "s.to" || host == "www.s.to" || host == "serienstream.to" || host == "www.serienstream.to"
+                || (customStoHost != null && host == customStoHost))
             {
                 return "sto";
             }
@@ -93,7 +119,8 @@ public static class UrlValidator
             return "hianime";
         }
 
-        if (url.Contains("s.to/", StringComparison.OrdinalIgnoreCase))
+        if (url.Contains("s.to/", StringComparison.OrdinalIgnoreCase) ||
+            url.Contains("serienstream.to/", StringComparison.OrdinalIgnoreCase))
         {
             return "sto";
         }

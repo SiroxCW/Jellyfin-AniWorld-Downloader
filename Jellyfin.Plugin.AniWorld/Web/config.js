@@ -37,6 +37,7 @@ export default function (view, params) {
             var sto = config.StoConfig || {};
             var stoFallback = sto.DownloadPath || '';
             view.querySelector('#chkStoEnabled').checked = sto.Enabled === true;
+            view.querySelector('#txtStoBaseUrl').value = config.StoBaseUrl || '';
             view.querySelector('#txtStoPath1').value = sto.DownloadPath1 || stoFallback;
             view.querySelector('#txtStoPath2').value = sto.DownloadPath2 || '';
             view.querySelector('#selStoLanguage').value = sto.PreferredLanguage || '1';
@@ -88,6 +89,7 @@ export default function (view, params) {
             // s.to
             if (!config.StoConfig) config.StoConfig = {};
             config.StoConfig.Enabled = view.querySelector('#chkStoEnabled').checked;
+            config.StoBaseUrl = view.querySelector('#txtStoBaseUrl').value.trim();
             config.StoConfig.DownloadPath1 = view.querySelector('#txtStoPath1').value.trim();
             config.StoConfig.DownloadPath2 = view.querySelector('#txtStoPath2').value.trim();
             config.StoConfig.DownloadPath = config.StoConfig.DownloadPath1;
