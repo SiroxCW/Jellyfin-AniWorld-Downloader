@@ -228,6 +228,17 @@
                         </div>
 
                         <div class="inputContainer">
+                            <label class="inputLabel" for="txtStoBaseUrl">Custom Base URL</label>
+                            <input is="emby-input" type="text" id="txtStoBaseUrl"
+                                   placeholder="https://s.to" />
+                            <div class="fieldDescription">
+                                Override the s.to base URL. Use this if s.to does not resolve on your network.
+                                For example, set to <code>https://serienstream.to</code> as an alternative.
+                                Leave empty to use the default (https://s.to).
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
                             <label class="inputLabel" for="txtStoPath1">Download Path (German Dub)</label>
                             <input is="emby-input" type="text" id="txtStoPath1"
                                    placeholder="/media/series" />

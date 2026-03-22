@@ -81,10 +81,17 @@ public class StoService : StreamingSiteService
     public override string SourceName => "sto";
 
     /// <inheritdoc />
-    protected override string BaseUrl => "https://s.to";
+    protected override string BaseUrl
+    {
+        get
+        {
+            var custom = Plugin.Instance?.Configuration?.StoBaseUrl;
+            return string.IsNullOrWhiteSpace(custom) ? "https://s.to" : custom.TrimEnd('/');
+        }
+    }
 
     /// <inheritdoc />
-    protected override string SearchUrl => "https://s.to/api/search/suggest";
+    protected override string SearchUrl => $"{BaseUrl}/api/search/suggest";
 
     /// <inheritdoc />
     protected override string SeriesPathPrefix => "/serie/";
@@ -277,7 +284,7 @@ public class StoService : StreamingSiteService
 
             var redirectUrl = playUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                 ? playUrl
-                : $"https://serienstream.to{playUrl}";
+                : $"{BaseUrl}{playUrl}";
 
             providers[langKey][provider] = redirectUrl;
         }
