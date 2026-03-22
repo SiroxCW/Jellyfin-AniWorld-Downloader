@@ -46,6 +46,12 @@ public class PluginConfiguration : BasePluginConfiguration
     public string MaintenanceMessage { get; set; } = "The downloader is currently under maintenance and does not accept new downloads at this time.";
 
     /// <summary>
+    /// Gets or sets the HTTP proxy URL for all network requests (e.g. "http://proxy:8080" or "socks5://proxy:1080").
+    /// Leave empty to not use a proxy.
+    /// </summary>
+    public string ProxyUrl { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets a custom base URL for s.to (e.g. "https://serienstream.to").
     /// Leave empty to use the default "https://s.to".
     /// </summary>

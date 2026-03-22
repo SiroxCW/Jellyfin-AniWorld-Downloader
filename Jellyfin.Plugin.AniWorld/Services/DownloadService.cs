@@ -854,6 +854,14 @@ public class DownloadService
         startInfo.ArgumentList.Add("-y");
         startInfo.ArgumentList.Add(task.OutputPath);
 
+        // Pass proxy to ffmpeg via the http_proxy environment variable
+        var proxyUrl = Plugin.Instance?.Configuration?.ProxyUrl;
+        if (!string.IsNullOrWhiteSpace(proxyUrl))
+        {
+            startInfo.Environment["http_proxy"] = proxyUrl;
+            startInfo.Environment["HTTP_PROXY"] = proxyUrl;
+        }
+
         _logger.LogDebug("Running ffmpeg for: {Url} -> {Path}", task.StreamUrl, task.OutputPath);
 
         using var process = new Process { StartInfo = startInfo };

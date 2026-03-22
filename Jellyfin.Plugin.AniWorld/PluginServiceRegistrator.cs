@@ -1,4 +1,6 @@
 using System;
+using System.Net;
+using System.Net.Http;
 using Jellyfin.Plugin.AniWorld.Extractors;
 using Jellyfin.Plugin.AniWorld.Services;
 using MediaBrowser.Controller;
@@ -17,9 +19,12 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        serviceCollection.AddHttpClient("AniWorld", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds));
-        serviceCollection.AddHttpClient("STO", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds));
-        serviceCollection.AddHttpClient("HiAnime", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds));
+        serviceCollection.AddHttpClient("AniWorld", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
+        serviceCollection.AddHttpClient("STO", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
+        serviceCollection.AddHttpClient("HiAnime", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
         serviceCollection.AddSingleton<AniWorldService>();
         serviceCollection.AddSingleton<StoService>();
         serviceCollection.AddSingleton<HiAnimeService>();
@@ -29,5 +34,33 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IStreamExtractor, VidozaExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, VidmolyExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, FilemoonExtractor>();
+    }
+
+    private static HttpMessageHandler ConfigureHandler(IServiceProvider _)
+    {
+        var proxyUrl = Plugin.Instance?.Configuration?.ProxyUrl;
+        if (!string.IsNullOrWhiteSpace(proxyUrl))
+        {
+            var proxyUri = new Uri(proxyUrl);
+            var isSocks = proxyUri.Scheme.StartsWith("socks", StringComparison.OrdinalIgnoreCase);
+
+            if (isSocks)
+            {
+                return new SocketsHttpHandler
+                {
+                    Proxy = new WebProxy(proxyUri),
+                    UseProxy = true,
+                };
+            }
+
+            var handler = new HttpClientHandler
+            {
+                Proxy = new WebProxy(proxyUri),
+                UseProxy = true,
+            };
+            return handler;
+        }
+
+        return new HttpClientHandler();
     }
 }

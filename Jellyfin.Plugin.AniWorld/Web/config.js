@@ -11,6 +11,7 @@ export default function (view, params) {
             view.querySelector('#chkNonAdminAccess').checked = config.EnableNonAdminAccess === true;
             view.querySelector('#chkMaintenanceMode').checked = config.MaintenanceMode === true;
             view.querySelector('#txtMaintenanceMessage').value = config.MaintenanceMessage || '';
+            view.querySelector('#txtProxyUrl').value = config.ProxyUrl || '';
 
             // AniWorld
             var aw = config.AniWorldConfig || {};
@@ -58,6 +59,7 @@ export default function (view, params) {
             config.EnableNonAdminAccess = view.querySelector('#chkNonAdminAccess').checked;
             config.MaintenanceMode = view.querySelector('#chkMaintenanceMode').checked;
             config.MaintenanceMessage = view.querySelector('#txtMaintenanceMessage').value.trim();
+            config.ProxyUrl = view.querySelector('#txtProxyUrl').value.trim();
 
             // AniWorld
             if (!config.AniWorldConfig) config.AniWorldConfig = {};
