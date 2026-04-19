@@ -57,6 +57,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string StoBaseUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets the dedicated download path for movies across all sources.
+    /// Leave empty to use the normal per-site/per-language download paths.
+    /// </summary>
+    public string MovieDownloadPath { get; set; } = string.Empty;
+
     // ── Per-site configs ─────────────────────────────────────────
 
     /// <summary>
@@ -116,8 +122,13 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Resolves the effective download path for a given source and language.
     /// Checks per-language paths first, then the general site path, then fallbacks.
     /// </summary>
-    public string GetDownloadPath(string source, string? language = null)
+    public string GetDownloadPath(string source, string? language = null, bool isMovie = false)
     {
+        if (isMovie && !string.IsNullOrEmpty(MovieDownloadPath))
+        {
+            return MovieDownloadPath;
+        }
+
         var siteConfig = GetSiteConfig(source);
 
         // 1. Per-language path for this site

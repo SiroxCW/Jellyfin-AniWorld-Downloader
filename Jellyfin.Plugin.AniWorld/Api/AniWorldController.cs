@@ -475,7 +475,8 @@ public class AniWorldController : ControllerBase
             return BadRequest("English Sub downloads are blocked for AniWorld. Only German Dub and German Sub are allowed.");
         }
 
-        var basePath = config?.GetDownloadPath(source, language) ?? string.Empty;
+        var isMovieRequest = PathHelper.MovieFromUrl.IsMatch(request.EpisodeUrl);
+        var basePath = config?.GetDownloadPath(source, language, isMovieRequest) ?? string.Empty;
 
         if (string.IsNullOrEmpty(basePath))
         {
@@ -606,11 +607,7 @@ public class AniWorldController : ControllerBase
         }
 
         var basePath = config?.GetDownloadPath(source, language) ?? string.Empty;
-
-        if (string.IsNullOrEmpty(basePath))
-        {
-            return BadRequest("No download path configured. Please set a download path in the plugin settings.");
-        }
+        var movieBasePath = config?.GetDownloadPath(source, language, true) ?? string.Empty;
 
         var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
         var seriesTitle = request.SeriesTitle ?? "Unknown";
@@ -653,6 +650,19 @@ public class AniWorldController : ControllerBase
             return BadRequest("No episodes found for this season.");
         }
 
+        var hasRegularEpisodes = episodes.Any(e => !e.IsMovie);
+        var hasMovieEpisodes = episodes.Any(e => e.IsMovie);
+
+        if ((useCustomTarget || hasRegularEpisodes) && string.IsNullOrEmpty(basePath))
+        {
+            return BadRequest("No download path configured. Please set a download path in the plugin settings.");
+        }
+
+        if (hasMovieEpisodes && string.IsNullOrEmpty(movieBasePath))
+        {
+            return BadRequest("No movie download path configured. Please set a path in the plugin settings.");
+        }
+
         var tasks = new List<DownloadTask>();
         var offset = useCustomTarget ? (request.EpisodeOffset ?? 0) : 0;
         var username = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
@@ -672,7 +682,16 @@ public class AniWorldController : ControllerBase
             }
             else
             {
-                outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url, effectiveEpNum);
+                var effectiveBasePath = ep.IsMovie
+                    ? movieBasePath
+                    : basePath;
+
+                if (string.IsNullOrEmpty(effectiveBasePath))
+                {
+                    continue;
+                }
+
+                outputPath = PathHelper.BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url, effectiveEpNum);
             }
 
             var (checkSeason, checkEpisode) = useCustomTarget
@@ -756,6 +775,7 @@ public class AniWorldController : ControllerBase
         }
 
         var basePath = config?.GetDownloadPath(source, language) ?? string.Empty;
+        var movieBasePath = config?.GetDownloadPath(source, language, true) ?? string.Empty;
 
         if (string.IsNullOrEmpty(basePath))
         {
@@ -834,7 +854,11 @@ public class AniWorldController : ControllerBase
                 }
                 else
                 {
-                    outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url, effectiveEpNum);
+                    var effectiveBasePath = ep.IsMovie
+                        ? movieBasePath
+                        : basePath;
+
+                    outputPath = PathHelper.BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url, effectiveEpNum);
                 }
 
                 var (checkSeason, checkEpisode) = useCustomTarget
@@ -880,7 +904,7 @@ public class AniWorldController : ControllerBase
 
             foreach (var ep in movies)
             {
-                var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, ep.Url);
+                var outputPath = PathHelper.BuildOutputPath(movieBasePath, seriesTitle, ep.Url);
 
                 var (movieSeason, movieEpisode) = PathHelper.ParseSeasonEpisode(ep.Url);
 

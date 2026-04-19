@@ -44,6 +44,10 @@ public abstract class StreamingSiteService
         @"<a[^>]*href=""(/(?:anime/stream|serie)/[^""]+/filme/film-\d+)""[^>]*>",
         RegexOptions.Compiled);
 
+    private static readonly Regex MovieSectionLinkPattern = new(
+        @"href=""/(?:anime/stream|serie)/[^""]+/filme(?:[""?#/]|$)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private readonly HttpClient _httpClient;
 
     /// <summary>Gets the HTTP client for derived classes.</summary>
@@ -171,8 +175,10 @@ public abstract class StreamingSiteService
             .OrderBy(s => s.Number)
             .ToList();
 
-        // Check for movies
-        var hasMovies = html.Contains("/filme/film-", StringComparison.OrdinalIgnoreCase);
+        // Check for movies. Some pages only expose the /filme section link on the series page
+        // and render concrete /filme/film-* entries on the movie subpage.
+        var hasMovies = html.Contains("/filme/film-", StringComparison.OrdinalIgnoreCase)
+            || MovieSectionLinkPattern.IsMatch(html);
 
         var coverUrl = coverMatch.Success ? coverMatch.Groups["src"].Value : string.Empty;
         if (!string.IsNullOrEmpty(coverUrl) && !coverUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))

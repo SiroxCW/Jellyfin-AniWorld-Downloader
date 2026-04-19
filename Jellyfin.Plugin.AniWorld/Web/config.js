@@ -12,6 +12,7 @@ export default function (view, params) {
             view.querySelector('#chkMaintenanceMode').checked = config.MaintenanceMode === true;
             view.querySelector('#txtMaintenanceMessage').value = config.MaintenanceMessage || '';
             view.querySelector('#txtProxyUrl').value = config.ProxyUrl || '';
+            view.querySelector('#txtMoviePath').value = config.MovieDownloadPath || '';
 
             // AniWorld
             var aw = config.AniWorldConfig || {};
@@ -60,6 +61,7 @@ export default function (view, params) {
             config.MaintenanceMode = view.querySelector('#chkMaintenanceMode').checked;
             config.MaintenanceMessage = view.querySelector('#txtMaintenanceMessage').value.trim();
             config.ProxyUrl = view.querySelector('#txtProxyUrl').value.trim();
+            config.MovieDownloadPath = view.querySelector('#txtMoviePath').value.trim();
 
             // AniWorld
             if (!config.AniWorldConfig) config.AniWorldConfig = {};
