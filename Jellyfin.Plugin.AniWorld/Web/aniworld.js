@@ -500,6 +500,7 @@ export default function (view, params) {
                 bar += getLangOptionsHtml(source);
                 bar += '</select>';
                 bar += '<label style="display:inline-flex;align-items:center;gap:0.3em;font-size:0.82em;cursor:pointer;opacity:0.85" title="Priority downloads are added to the front of the queue"><input type="checkbox" id="aw-priority-cb" style="cursor:pointer"> Priority</label>';
+                bar += '<label style="display:inline-flex;align-items:center;gap:0.3em;font-size:0.82em;cursor:pointer;opacity:0.85" title="Redownload episodes even if they are already flagged as downloaded"><input type="checkbox" id="aw-force-cb" style="cursor:pointer"> Force</label>';
                 bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')">\u2B07\uFE0F Download Season</button>';
                 if (AW.currentSeriesUrl && source !== 'hianime') {
                     bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')">\u2B07\uFE0F Download All Seasons</button>';
@@ -800,6 +801,11 @@ export default function (view, params) {
             return cb ? cb.checked : false;
         },
 
+        _isForceChecked: function () {
+            var cb = view.querySelector('#aw-force-cb');
+            return cb ? cb.checked : false;
+        },
+
         _checkMaintenance: function () {
             if (this.maintenanceMode) {
                 Dashboard.alert('Downloads are blocked: maintenance mode is active.');
@@ -839,6 +845,7 @@ export default function (view, params) {
             };
 
             if (this._isPriorityChecked()) body.Priority = true;
+            if (this._isForceChecked()) body.Force = true;
 
             if (customTarget) {
                 body.CustomFolder = customTarget.folder;
@@ -883,6 +890,7 @@ export default function (view, params) {
             };
 
             if (this._isPriorityChecked()) body.Priority = true;
+            if (this._isForceChecked()) body.Force = true;
 
             if (customTarget) {
                 body.CustomFolder = customTarget.folder;
@@ -927,6 +935,7 @@ export default function (view, params) {
             if (provider) body.Provider = provider;
             if (episodeNumber != null) body.EpisodeNumber = episodeNumber;
             if (this._isPriorityChecked()) body.Priority = true;
+            if (this._isForceChecked()) body.Force = true;
             if (customTarget) {
                 body.CustomFolder = customTarget.folder;
                 body.CustomSeason = customTarget.season;
