@@ -699,7 +699,7 @@ public class AniWorldController : ControllerBase
                 : PathHelper.ParseSeasonEpisode(ep.Url, effectiveEpNum);
             var checkTitle = useCustomTarget ? request.CustomFolder! : seriesTitle;
 
-            if (_downloadService.IsAlreadyDownloaded(checkTitle, checkSeason, checkEpisode, language))
+            if (!request.Force && _downloadService.IsAlreadyDownloaded(checkTitle, checkSeason, checkEpisode, language))
             {
                 continue;
             }
@@ -866,7 +866,7 @@ public class AniWorldController : ControllerBase
                     : PathHelper.ParseSeasonEpisode(ep.Url, effectiveEpNum);
                 var checkTitle = useCustomTarget ? request.CustomFolder! : seriesTitle;
 
-                if (_downloadService.IsAlreadyDownloaded(checkTitle, checkSeason, checkEpisode, language))
+                if (!request.Force && _downloadService.IsAlreadyDownloaded(checkTitle, checkSeason, checkEpisode, language))
                 {
                     skippedCount++;
                     continue;
@@ -908,7 +908,7 @@ public class AniWorldController : ControllerBase
 
                 var (movieSeason, movieEpisode) = PathHelper.ParseSeasonEpisode(ep.Url);
 
-                if (_downloadService.IsAlreadyDownloaded(seriesTitle, movieSeason, movieEpisode, language))
+                if (!request.Force && _downloadService.IsAlreadyDownloaded(seriesTitle, movieSeason, movieEpisode, language))
                 {
                     skippedCount++;
                     continue;
@@ -1251,6 +1251,9 @@ public class BatchDownloadRequest
 
     /// <summary>Gets or sets whether this is a priority download (added to front of queue).</summary>
     public bool Priority { get; set; }
+
+    /// <summary>Gets or sets whether to force re-download of episodes already marked as downloaded.</summary>
+    public bool Force { get; set; }
 }
 
 /// <summary>
@@ -1284,4 +1287,7 @@ public class FullSeriesDownloadRequest
 
     /// <summary>Gets or sets whether this is a priority download (added to front of queue).</summary>
     public bool Priority { get; set; }
+
+    /// <summary>Gets or sets whether to force re-download of episodes already marked as downloaded.</summary>
+    public bool Force { get; set; }
 }
