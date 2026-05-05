@@ -29,7 +29,7 @@ This plugin is a lightweight downloader built into Jellyfin for convenience. If 
 
 ## Requirements
 
-- Jellyfin **10.9.0** or newer
+- Jellyfin **10.11.0** or newer
 - **ffmpeg** (bundled with Jellyfin)
 - **[File Transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation)** plugin (optional, required for non-admin access)
 

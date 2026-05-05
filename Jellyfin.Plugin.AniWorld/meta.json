@@ -6,7 +6,7 @@
   "name": "AniWorld Downloader",
   "overview": "Download anime from aniworld.to directly within Jellyfin",
   "owner": "SiroxCW",
-  "targetAbi": "10.9.0.0",
+  "targetAbi": "10.11.0.0",
   "timestamp": "2026-03-16T14:19:19Z",
   "version": "1.6.0.0",
   "status": "Active",
