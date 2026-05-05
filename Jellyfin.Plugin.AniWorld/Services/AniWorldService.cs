@@ -28,8 +28,11 @@ public class AniWorldService : StreamingSiteService
     /// <summary>
     /// Initializes a new instance of the <see cref="AniWorldService"/> class.
     /// </summary>
-    public AniWorldService(IHttpClientFactory httpClientFactory, ILogger<AniWorldService> logger)
-        : base(httpClientFactory.CreateClient("AniWorld"), logger)
+    public AniWorldService(
+        IHttpClientFactory httpClientFactory,
+        ILogger<AniWorldService> logger,
+        CaptchaSessionService captchaSession)
+        : base(httpClientFactory.CreateClient("AniWorld"), logger, captchaSession)
     {
     }
 
