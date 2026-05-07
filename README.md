@@ -146,6 +146,26 @@ Non-admin users will see an **AniWorld Downloader** entry in the sidebar that op
 | **Vidmoly** | aniworld/s.to | Extracts HLS URLs from JavaScript sources |
 | **Vidoza** | aniworld/s.to | Extracts MP4 URLs from source tags |
 
+## Known Issues
+
+### s.to downloads fail with "No JSON script blocks found in VOE page"
+
+s.to has put their provider redirector (`/r?t=...`) behind a Cloudflare Turnstile gate that activates **per-IP** for "flagged" egress addresses. Many datacenter ranges (Hetzner, OVH, etc.) get the gate; most residential IPs don't. From a flagged IP, every download retry produces logs like:
+
+```
+Resolved to embed URL: "https://s.to/r?t=..."
+No JSON script blocks found in VOE page
+Failed to extract VOE source from page
+```
+
+Because the gate requires a real browser to solve an interactive Turnstile widget, the plugin can't bypass it on its own. Your options:
+
+1. **Route the plugin through a clean proxy.** Set **Proxy Server** in plugin settings to a SOCKS5 or HTTP proxy on a residential / unflagged IP (e.g. `socks5://user:pass@proxy:1080`). Restart Jellyfin. This is the recommended fix.
+2. **Use a VPN on the Jellyfin host** so all outbound traffic exits a clean IP.
+3. **aniworld.to is currently unaffected** — if you only need anime, downloads still work normally on flagged IPs.
+
+To check whether your server's IP is flagged, the repo includes [`scripts/check-sto-flag.sh`](scripts/check-sto-flag.sh): copy it to the server and run it.
+
 ## License
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).

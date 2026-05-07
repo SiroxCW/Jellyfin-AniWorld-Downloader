@@ -84,28 +84,6 @@
                         </div>
 
                         <div class="inputContainer">
-                            <label class="inputLabel" for="txtFlareSolverrUrl">FlareSolverr URL</label>
-                            <input is="emby-input" type="text" id="txtFlareSolverrUrl"
-                                   placeholder="http://flaresolverr:8191/v1" />
-                            <div class="fieldDescription">
-                                Optional. When s.to or aniworld.to start serving a DDoS-Guard / Cloudflare captcha,
-                                fetches are routed through a <a href="https://github.com/FlareSolverr/FlareSolverr" target="_blank" rel="noopener">FlareSolverr</a> instance
-                                so the challenge is solved automatically by a real headless browser. The cookies it returns are
-                                cached and reused for subsequent downloads, so you only pay the FlareSolverr round-trip when a fresh challenge appears.
-                                Leave empty to disable. Example: <code>http://flaresolverr:8191/v1</code>.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtFlareSolverrTimeout">FlareSolverr Timeout (seconds)</label>
-                            <input is="emby-input" type="number" id="txtFlareSolverrTimeout"
-                                   min="15" max="300" placeholder="60" />
-                            <div class="fieldDescription">
-                                Max time to wait for FlareSolverr to solve a challenge. 60 seconds is usually enough; raise it on slow hardware.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
                             <label class="inputLabel" for="txtMoviePath">Movie Download Path</label>
                             <input is="emby-input" type="text" id="txtMoviePath"
                                    placeholder="/media/movies" />

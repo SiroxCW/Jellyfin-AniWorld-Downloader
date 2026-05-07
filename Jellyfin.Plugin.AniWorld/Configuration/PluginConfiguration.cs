@@ -52,19 +52,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public string ProxyUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the FlareSolverr endpoint URL (e.g. "http://flaresolverr:8191/v1").
-    /// When set, DDoS-Guard / Cloudflare challenge pages encountered while fetching s.to,
-    /// aniworld.to or VOE embeds are forwarded to FlareSolverr to be solved by a real browser.
-    /// Leave empty to disable.
-    /// </summary>
-    public string FlareSolverrUrl { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Gets or sets the FlareSolverr request timeout in seconds.
-    /// </summary>
-    public int FlareSolverrTimeoutSeconds { get; set; } = 60;
-
-    /// <summary>
     /// Gets or sets a custom base URL for s.to (e.g. "https://serienstream.to").
     /// Leave empty to use the default "https://s.to".
     /// </summary>

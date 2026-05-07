@@ -6,7 +6,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.AniWorld.Helpers;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AniWorld.Services;
@@ -50,7 +49,6 @@ public abstract class StreamingSiteService
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly HttpClient _httpClient;
-    private readonly CaptchaSessionService? _captchaSession;
 
     /// <summary>Gets the HTTP client for derived classes.</summary>
     protected HttpClient HttpClient => _httpClient;
@@ -63,18 +61,11 @@ public abstract class StreamingSiteService
     /// <summary>
     /// Initializes a new instance of the <see cref="StreamingSiteService"/> class.
     /// </summary>
-    protected StreamingSiteService(HttpClient httpClient, ILogger logger, CaptchaSessionService? captchaSession = null)
+    protected StreamingSiteService(HttpClient httpClient, ILogger logger)
     {
         _httpClient = httpClient;
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
-        _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("de-DE,de;q=0.9,en;q=0.8");
-        if (!_httpClient.DefaultRequestHeaders.Accept.Any())
-        {
-            _httpClient.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-        }
-
         Logger = logger;
-        _captchaSession = captchaSession;
     }
 
     // ── Abstract site-specific members ──────────────────────────
@@ -326,43 +317,12 @@ public abstract class StreamingSiteService
 
     /// <summary>
     /// Resolves a redirect URL to the actual provider embed URL.
-    /// If the response is a DDoS-Guard / Cloudflare challenge page, it is
-    /// solved via FlareSolverr (when configured) before returning so that
-    /// follow-up extractor fetches see the real embed page.
     /// </summary>
     public async Task<string> ResolveRedirectAsync(string redirectUrl, CancellationToken cancellationToken = default)
     {
-        var request = BuildRequest(HttpMethod.Get, redirectUrl);
-        var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        var finalUrl = response.RequestMessage?.RequestUri?.ToString() ?? redirectUrl;
-
-        // Sniff the body once. If it's a challenge page, solve it now so the
-        // cookie jar is primed before the extractor's own fetch.
-        var html = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        if (ChallengeDetector.IsChallenge(html) && _captchaSession?.IsConfigured == true)
-        {
-            Logger.LogWarning("Challenge page on redirect resolution {Url} — calling FlareSolverr", finalUrl);
-            await _captchaSession.SolveAsync(finalUrl, cancellationToken).ConfigureAwait(false);
-        }
-
-        return finalUrl;
-    }
-
-    /// <summary>
-    /// Builds a request with cookies + UA pinning for hosts that have a
-    /// FlareSolverr session, so DDoS-Guard's UA-bound cookies remain valid.
-    /// </summary>
-    private HttpRequestMessage BuildRequest(HttpMethod method, string url)
-    {
-        var request = new HttpRequestMessage(method, url);
-        var pinnedUa = _captchaSession?.GetUserAgentFor(url);
-        if (!string.IsNullOrEmpty(pinnedUa))
-        {
-            request.Headers.UserAgent.Clear();
-            request.Headers.UserAgent.ParseAdd(pinnedUa);
-        }
-
-        return request;
+        var request = new HttpRequestMessage(HttpMethod.Get, redirectUrl);
+        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        return response.RequestMessage?.RequestUri?.ToString() ?? redirectUrl;
     }
 
     // ── Protected helpers ───────────────────────────────────────
@@ -406,52 +366,12 @@ public abstract class StreamingSiteService
     }
 
     /// <summary>
-    /// Fetches a page from the site. If the response looks like a DDoS-Guard /
-    /// Cloudflare challenge and FlareSolverr is configured, the request is
-    /// re-issued through FlareSolverr and the solved HTML is returned instead.
+    /// Fetches a page from the site.
     /// </summary>
     protected async Task<string> FetchPageAsync(string url, CancellationToken cancellationToken)
     {
         Logger.LogDebug("Fetching page: {Url}", url);
-        var html = await FetchPageRawAsync(url, cancellationToken).ConfigureAwait(false);
-
-        if (!ChallengeDetector.IsChallenge(html))
-        {
-            return html;
-        }
-
-        if (_captchaSession?.IsConfigured == true)
-        {
-            Logger.LogWarning("Detected challenge page on {Url} — calling FlareSolverr", url);
-            var solved = await _captchaSession.SolveAsync(url, cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(solved))
-            {
-                return solved;
-            }
-
-            // SolveAsync returned empty when another caller solved this host
-            // very recently — cookies are now in the jar, retry natively.
-            if (solved == string.Empty)
-            {
-                return await FetchPageRawAsync(url, cancellationToken).ConfigureAwait(false);
-            }
-
-            Logger.LogError("FlareSolverr could not solve {Url}; returning challenge HTML", url);
-        }
-        else
-        {
-            Logger.LogWarning(
-                "Detected challenge page on {Url} — set FlareSolverrUrl in plugin settings to bypass automatically",
-                url);
-        }
-
-        return html;
-    }
-
-    private async Task<string> FetchPageRawAsync(string url, CancellationToken cancellationToken)
-    {
-        using var request = BuildRequest(HttpMethod.Get, url);
-        var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        var response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
     }

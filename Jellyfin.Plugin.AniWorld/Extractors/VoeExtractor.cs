@@ -6,8 +6,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.AniWorld.Helpers;
-using Jellyfin.Plugin.AniWorld.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AniWorld.Extractors;
@@ -32,30 +30,18 @@ public class VoeExtractor : IStreamExtractor
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<VoeExtractor> _logger;
-    private readonly CaptchaSessionService _captchaSession;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VoeExtractor"/> class.
     /// </summary>
     /// <param name="httpClientFactory">HTTP client factory.</param>
     /// <param name="logger">Logger instance.</param>
-    /// <param name="captchaSession">Captcha session service.</param>
-    public VoeExtractor(
-        IHttpClientFactory httpClientFactory,
-        ILogger<VoeExtractor> logger,
-        CaptchaSessionService captchaSession)
+    public VoeExtractor(IHttpClientFactory httpClientFactory, ILogger<VoeExtractor> logger)
     {
         _httpClient = httpClientFactory.CreateClient("AniWorld");
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
-        _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("de-DE,de;q=0.9,en;q=0.8");
-        if (!_httpClient.DefaultRequestHeaders.Accept.Any())
-        {
-            _httpClient.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-        }
-
         _logger = logger;
-        _captchaSession = captchaSession;
     }
 
     /// <inheritdoc />
@@ -91,7 +77,9 @@ public class VoeExtractor : IStreamExtractor
 
     private async Task<string> FetchWithJsRedirectAsync(string url, CancellationToken cancellationToken)
     {
-        var html = await FetchAsync(url, cancellationToken).ConfigureAwait(false);
+        var response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        var html = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
         // VOE uses a JS redirect: voe.sx page contains window.location.href = 'https://randomdomain.com/e/...'
         // We need to follow this JS redirect manually since HttpClient won't execute JS
@@ -106,7 +94,9 @@ public class VoeExtractor : IStreamExtractor
                 if (redirectUrl != url)
                 {
                     _logger.LogDebug("Following VOE JS redirect: {RedirectUrl}", redirectUrl);
-                    html = await FetchAsync(redirectUrl, cancellationToken).ConfigureAwait(false);
+                    response = await _httpClient.GetAsync(redirectUrl, cancellationToken).ConfigureAwait(false);
+                    response.EnsureSuccessStatusCode();
+                    html = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
                     // Check if this page has the JSON block
                     if (ScriptJsonPattern.IsMatch(html))
@@ -122,66 +112,13 @@ public class VoeExtractor : IStreamExtractor
             if (urlMatch.Success && urlMatch.Value != url)
             {
                 _logger.LogDebug("Following VOE fallback redirect: {RedirectUrl}", urlMatch.Value);
-                html = await FetchAsync(urlMatch.Value, cancellationToken).ConfigureAwait(false);
+                response = await _httpClient.GetAsync(urlMatch.Value, cancellationToken).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                html = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
         return html;
-    }
-
-    /// <summary>
-    /// Fetches a URL with UA pinning to whatever User-Agent solved the latest
-    /// challenge for this host. If the response is a challenge page, route it
-    /// through FlareSolverr (when configured) and return the solved HTML.
-    /// </summary>
-    private async Task<string> FetchAsync(string url, CancellationToken cancellationToken)
-    {
-        var html = await FetchRawAsync(url, cancellationToken).ConfigureAwait(false);
-
-        if (!ChallengeDetector.IsChallenge(html))
-        {
-            return html;
-        }
-
-        if (_captchaSession.IsConfigured)
-        {
-            _logger.LogWarning("Detected challenge page on {Url} — calling FlareSolverr", url);
-            var solved = await _captchaSession.SolveAsync(url, cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(solved))
-            {
-                return solved;
-            }
-
-            if (solved == string.Empty)
-            {
-                return await FetchRawAsync(url, cancellationToken).ConfigureAwait(false);
-            }
-
-            _logger.LogError("FlareSolverr failed to solve {Url}", url);
-        }
-        else
-        {
-            _logger.LogWarning(
-                "Detected challenge page on {Url} — set FlareSolverrUrl in plugin settings to bypass automatically",
-                url);
-        }
-
-        return html;
-    }
-
-    private async Task<string> FetchRawAsync(string url, CancellationToken cancellationToken)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        var pinnedUa = _captchaSession.GetUserAgentFor(url);
-        if (!string.IsNullOrEmpty(pinnedUa))
-        {
-            request.Headers.UserAgent.Clear();
-            request.Headers.UserAgent.ParseAdd(pinnedUa);
-        }
-
-        var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private string? ExtractVoeSourceFromHtml(string html)

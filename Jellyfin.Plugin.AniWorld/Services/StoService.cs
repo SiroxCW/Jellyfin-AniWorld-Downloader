@@ -72,11 +72,8 @@ public class StoService : StreamingSiteService
     /// <summary>
     /// Initializes a new instance of the <see cref="StoService"/> class.
     /// </summary>
-    public StoService(
-        IHttpClientFactory httpClientFactory,
-        ILogger<StoService> logger,
-        CaptchaSessionService captchaSession)
-        : base(httpClientFactory.CreateClient("STO"), logger, captchaSession)
+    public StoService(IHttpClientFactory httpClientFactory, ILogger<StoService> logger)
+        : base(httpClientFactory.CreateClient("STO"), logger)
     {
     }
 

@@ -16,14 +16,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
     private const int HttpClientTimeoutSeconds = 50;
 
-    /// <summary>
-    /// Shared cookie jar across every named HttpClient. Lets cookies obtained on
-    /// one site (or via FlareSolverr) flow into subsequent requests on related
-    /// hosts — DDoS-Guard's __ddg* cookies get scoped by domain and are reused
-    /// by every extractor that hits the same host afterwards.
-    /// </summary>
-    private static readonly CookieContainer SharedCookies = new();
-
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
@@ -33,31 +25,16 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
         serviceCollection.AddHttpClient("HiAnime", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
             .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
-
-        // FlareSolverr typically runs on the same Docker network and shouldn't
-        // be routed through the same outbound proxy — give it a plain handler.
-        serviceCollection.AddHttpClient("FlareSolverr", c =>
-        {
-            c.Timeout = TimeSpan.FromSeconds(120);
-        });
-
         serviceCollection.AddSingleton<AniWorldService>();
         serviceCollection.AddSingleton<StoService>();
         serviceCollection.AddSingleton<HiAnimeService>();
         serviceCollection.AddSingleton<DownloadHistoryService>();
         serviceCollection.AddSingleton<DownloadService>();
-        serviceCollection.AddSingleton<FlareSolverrClient>();
-        serviceCollection.AddSingleton<CaptchaSessionService>();
         serviceCollection.AddSingleton<IStreamExtractor, VoeExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, VidozaExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, VidmolyExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, FilemoonExtractor>();
     }
-
-    /// <summary>
-    /// Gets the shared cookie container used by every named HttpClient.
-    /// </summary>
-    internal static CookieContainer Cookies => SharedCookies;
 
     private static HttpMessageHandler ConfigureHandler(IServiceProvider _)
     {
@@ -73,27 +50,17 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
                 {
                     Proxy = new WebProxy(proxyUri),
                     UseProxy = true,
-                    UseCookies = true,
-                    CookieContainer = SharedCookies,
-                    AllowAutoRedirect = true,
                 };
             }
 
-            return new HttpClientHandler
+            var handler = new HttpClientHandler
             {
                 Proxy = new WebProxy(proxyUri),
                 UseProxy = true,
-                UseCookies = true,
-                CookieContainer = SharedCookies,
-                AllowAutoRedirect = true,
             };
+            return handler;
         }
 
-        return new HttpClientHandler
-        {
-            UseCookies = true,
-            CookieContainer = SharedCookies,
-            AllowAutoRedirect = true,
-        };
+        return new HttpClientHandler();
     }
 }
