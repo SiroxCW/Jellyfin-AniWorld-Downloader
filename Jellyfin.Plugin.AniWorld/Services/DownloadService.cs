@@ -642,38 +642,140 @@ public class DownloadService
         string language,
         string excludeProvider)
     {
-        if (!details.ProvidersByLanguage.TryGetValue(language, out var providers))
+        // Helper: try find provider inside a single language block
+        (string provider, string url)? FindInLanguage(string lang)
         {
+            if (!details.ProvidersByLanguage.TryGetValue(lang, out var providers))
+            {
+                return null;
+            }
+
+            var providerPriority = new[] { "VOE", "Filemoon", "Vidmoly", "Vidoza" };
+            var extractorNames = _extractors.Select(e => e.ProviderName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var prov in providerPriority)
+            {
+                if (prov.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (providers.TryGetValue(prov, out var url) &&
+                    extractorNames.Contains(prov))
+                {
+                    return (prov, url);
+                }
+            }
+
+            foreach (var (name, url) in providers)
+            {
+                if (!name.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase) &&
+                    extractorNames.Contains(name))
+                {
+                    return (name, url);
+                }
+            }
+
             return null;
         }
 
-        var providerPriority = new[] { "VOE", "Filemoon", "Vidmoly", "Vidoza" };
-        var extractorNames = _extractors.Select(e => e.ProviderName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var prov in providerPriority)
+        // 1) Try in the requested language first
+        var found = FindInLanguage(language);
+        if (found != null)
         {
-            if (prov.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase))
+            return found;
+        }
+
+        // 2) Build fallback language order from configuration
+        var configValue = Plugin.Instance?.Configuration?.LanguageFallbackOrder ?? "1";
+        var fallbackOrder = GetFallbackLanguageOrder(language, configValue);
+
+        // If config indicates "No fallback" (e.g. option "1"), this will be empty.
+        foreach (var lang in fallbackOrder)
+        {
+            if (lang.Equals(language, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            if (providers.TryGetValue(prov, out var url) &&
-                extractorNames.Contains(prov))
+            found = FindInLanguage(lang);
+            if (found != null)
             {
-                return (prov, url);
-            }
-        }
-
-        foreach (var (name, url) in providers)
-        {
-            if (!name.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase) &&
-                extractorNames.Contains(name))
-            {
-                return (name, url);
+                return found;
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Returns language keys in the configured fallback order suitable for the requested language key.
+    /// </summary>
+    private IEnumerable<string> GetFallbackLanguageOrder(string currentLanguage, string configOption)
+    {
+        // Map numeric options (see PluginConfiguration.LanguageFallbackOrder) to language-key orders.
+        // Options (as in config docs):
+        // "1" = No fallback
+        // "2" = German DUB > German SUB > English SUB (recommended)
+        // "3" = German DUB > English SUB > German SUB
+        // "4" = English SUB > German DUB > German SUB
+        // "5" = English SUB > German SUB > German DUB
+        // "6" = German SUB > German DUB > English SUB
+        // "7" = German SUB > English SUB > German DUB
+        // We support both AniWorld/s.to keys ("1","2","3") and HiAnime keys ("sub","dub").
+
+        // Normalize config option
+        if (!int.TryParse(configOption, out var opt))
+        {
+            opt = 1;
+        }
+
+        // Helper to return order for anime-style keys ("1"=GerDub, "2"=EngSub, "3"=GerSub)
+        string[] MapAnimeOrder(int option) => option switch
+        {
+            2 => [ "1", "3", "2" ],
+            3 => [ "1", "2", "3" ],
+            4 => [ "2", "1", "3" ],
+            5 => [ "2", "3", "1" ],
+            6 => [ "3", "1", "2" ],
+            7 => [ "3", "2", "1" ],
+            _ => Array.Empty<string>(), // "1" or unknown => no fallback
+        };
+
+        // Helper to return order for hianime-style keys ("dub","sub")
+        string[] MapHiAnimeOrder(int option) => option switch
+        {
+            2 => [ "dub", "sub" ], // treat recommended mapping as dub->sub
+            3 => [ "dub", "sub" ],
+            4 => [ "sub", "dub" ],
+            5 => [ "sub", "dub" ],
+            6 => [ "sub", "dub" ],
+            7 => [ "sub", "dub" ],
+            _ => Array.Empty<string>(),
+        };
+
+        // Decide mapping based on the namespace of the currentLanguage
+        if (string.Equals(currentLanguage, "sub", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(currentLanguage, "dub", StringComparison.OrdinalIgnoreCase))
+        {
+            var order = MapHiAnimeOrder(opt);
+            // Ensure current language included first if config produced an order
+            if (order.Length > 0 && !order.Contains(currentLanguage, StringComparer.OrdinalIgnoreCase))
+            {
+                order = (new[] { currentLanguage }).Concat(order).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            return order;
+        }
+        else
+        {
+            var order = MapAnimeOrder(opt);
+            if (order.Length > 0 && !order.Contains(currentLanguage, StringComparer.OrdinalIgnoreCase))
+            {
+                // Put requested language first so loops skip it quickly
+                order = (new[] { currentLanguage }).Concat(order).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            return order;
+        }
     }
 
     /// <summary>
