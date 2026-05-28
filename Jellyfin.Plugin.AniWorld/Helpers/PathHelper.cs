@@ -27,18 +27,11 @@ public static class PathHelper
 
     /// <summary>
     /// Regex to extract the series slug from a URL.
-    /// Supports /anime/stream/{slug} (aniworld), /serie/{slug} (s.to), and /watch/{slug} (hianime).
+    /// Supports /anime/stream/{slug} (aniworld) and /serie/{slug} (s.to).
     /// </summary>
     public static readonly Regex SeriesSlugFromUrl = new(
-        @"/(?:anime/stream|serie|watch)/(?<slug>[^/?\#]+)",
+        @"/(?:anime/stream|serie)/(?<slug>[^/?\#]+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    /// <summary>
-    /// Regex to extract episode number from a HiAnime URL (?ep=N).
-    /// </summary>
-    public static readonly Regex HiAnimeEpisodeFromUrl = new(
-        @"[?&]ep=(?<episode>\d+)",
-        RegexOptions.Compiled);
 
     /// <summary>
     /// Sanitizes a file/folder name by removing invalid and problematic characters.
@@ -69,28 +62,9 @@ public static class PathHelper
     /// <summary>
     /// Parses season and episode numbers from an episode URL.
     /// Returns (0, N) for movies and (0, 0) for unrecognised URLs.
-    /// HiAnime URLs always return Season 1. When <paramref name="episodeNumber"/> is provided
-    /// it is used as the episode number; otherwise falls back to the ?ep=N URL parameter.
     /// </summary>
-    public static (int Season, int Episode) ParseSeasonEpisode(string url, int? episodeNumber = null)
+    public static (int Season, int Episode) ParseSeasonEpisode(string url)
     {
-        // HiAnime: /watch/{slug}?ep=N → Season 1
-        if (url.Contains("hianime.to", StringComparison.OrdinalIgnoreCase))
-        {
-            if (episodeNumber.HasValue)
-            {
-                return (1, episodeNumber.Value);
-            }
-
-            var hiMatch = HiAnimeEpisodeFromUrl.Match(url);
-            if (hiMatch.Success)
-            {
-                return (1, int.Parse(hiMatch.Groups["episode"].Value));
-            }
-
-            return (1, 0);
-        }
-
         var seMatch = SeasonEpisodeFromUrl.Match(url);
         if (seMatch.Success)
         {
@@ -109,30 +83,10 @@ public static class PathHelper
     /// <summary>
     /// Builds a Jellyfin-compatible output path from the episode URL.
     /// Format: basePath/SeriesName/Season XX/SeriesName - SXXEXX.mkv
-    /// When <paramref name="episodeNumber"/> is provided it is used for HiAnime episodes
-    /// instead of the ?ep=N URL parameter (which is an internal ID, not the sequential number).
     /// </summary>
-    public static string BuildOutputPath(string basePath, string seriesTitle, string episodeUrl, int? episodeNumber = null)
+    public static string BuildOutputPath(string basePath, string seriesTitle, string episodeUrl)
     {
         var safeName = SanitizeFileName(seriesTitle);
-
-        // HiAnime: always Season 01
-        if (episodeUrl.Contains("hianime.to", StringComparison.OrdinalIgnoreCase))
-        {
-            int epNum;
-            if (episodeNumber.HasValue)
-            {
-                epNum = episodeNumber.Value;
-            }
-            else
-            {
-                var hiMatch = HiAnimeEpisodeFromUrl.Match(episodeUrl);
-                epNum = hiMatch.Success ? int.Parse(hiMatch.Groups["episode"].Value) : 1;
-            }
-
-            var fileName = $"{safeName} - S01E{epNum:D2}.mkv";
-            return Path.Combine(basePath, safeName, "Season 01", fileName);
-        }
 
         var seMatch = SeasonEpisodeFromUrl.Match(episodeUrl);
         if (seMatch.Success)
@@ -158,59 +112,6 @@ public static class PathHelper
         var slugMatch = SeriesSlugFromUrl.Match(episodeUrl);
         var slug = slugMatch.Success ? slugMatch.Groups["slug"].Value : "unknown";
         return Path.Combine(basePath, safeName, $"{slug}_{DateTime.UtcNow:yyyyMMddHHmmss}.mkv");
-    }
-
-    /// <summary>
-    /// Regex to extract episode numbers from filenames like "SeriesName - S01E05.mkv" or "SeriesName - S01E05 - Title.mkv".
-    /// </summary>
-    private static readonly Regex EpisodeFilePattern = new(
-        @"- S\d{2}E(?<episode>\d{2,})",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    /// <summary>
-    /// Builds a Jellyfin-compatible output path using a custom folder and season number.
-    /// Format: basePath/SanitizedFolder/Season XX/SanitizedFolder - SXXEXX.mkv
-    /// Used when downloading HiAnime episodes into an existing series folder.
-    /// </summary>
-    public static string BuildOutputPathCustom(
-        string basePath, string customFolder, int seasonNumber, int episodeNumber)
-    {
-        var safeName = SanitizeFileName(customFolder);
-        var seasonFolder = $"Season {seasonNumber:D2}";
-        var fileName = $"{safeName} - S{seasonNumber:D2}E{episodeNumber:D2}.mkv";
-        return Path.Combine(basePath, safeName, seasonFolder, fileName);
-    }
-
-    /// <summary>
-    /// Scans a season folder for existing episodes and returns the highest episode number found.
-    /// Returns 0 if the folder doesn't exist or contains no matching files.
-    /// </summary>
-    public static int GetHighestEpisodeNumber(string basePath, string folderName, int seasonNumber)
-    {
-        var safeName = SanitizeFileName(folderName);
-        var seasonFolder = $"Season {seasonNumber:D2}";
-        var seasonPath = Path.Combine(basePath, safeName, seasonFolder);
-
-        if (!Directory.Exists(seasonPath))
-        {
-            return 0;
-        }
-
-        var highest = 0;
-        foreach (var file in Directory.EnumerateFiles(seasonPath, "*.mkv"))
-        {
-            var fileName = Path.GetFileName(file);
-            var match = EpisodeFilePattern.Match(fileName);
-            if (match.Success && int.TryParse(match.Groups["episode"].Value, out var epNum))
-            {
-                if (epNum > highest)
-                {
-                    highest = epNum;
-                }
-            }
-        }
-
-        return highest;
     }
 
     /// <summary>

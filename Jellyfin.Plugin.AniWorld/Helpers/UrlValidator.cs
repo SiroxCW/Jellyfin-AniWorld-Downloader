@@ -12,8 +12,6 @@ public static class UrlValidator
         "aniworld.to", "www.aniworld.to",
         "s.to", "www.s.to",
         "serienstream.to", "www.serienstream.to",
-        // NOTE: HiAnime (hianime.to) has been shut down (March 2026) — removed from allowlist
-        // "hianime.to", "www.hianime.to",
     };
 
     /// <summary>
@@ -81,7 +79,7 @@ public static class UrlValidator
 
     /// <summary>
     /// Detects the source site from a URL.
-    /// Returns "aniworld", "sto", or "hianime".
+    /// Returns "aniworld" or "sto".
     /// </summary>
     public static string DetectSource(string url)
     {
@@ -106,19 +104,9 @@ public static class UrlValidator
             {
                 return "sto";
             }
-
-            if (host == "hianime.to" || host == "www.hianime.to")
-            {
-                return "hianime";
-            }
         }
 
         // Also check raw string for cases without full URI parsing
-        if (url.Contains("hianime.to/", StringComparison.OrdinalIgnoreCase))
-        {
-            return "hianime";
-        }
-
         if (url.Contains("s.to/", StringComparison.OrdinalIgnoreCase) ||
             url.Contains("serienstream.to/", StringComparison.OrdinalIgnoreCase))
         {

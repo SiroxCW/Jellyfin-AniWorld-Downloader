@@ -54,9 +54,6 @@ export default function (view, params) {
 
     // Language names per source (plain text)
     function getLangNames(source) {
-        if (source === 'hianime') {
-            return { 'sub': 'English Sub', 'dub': 'English Dub' };
-        }
         if (source === 'sto') {
             return { '1': 'German Dub', '2': 'English Dub' };
         }
@@ -73,12 +70,6 @@ export default function (view, params) {
 
     // Build language options HTML for season bar
     function getLangOptionsHtml(source) {
-        if (source === 'hianime') {
-            var html = '<option value="">\uD83C\uDF10 Use Settings Default</option>';
-            html += '<option value="sub">\uD83C\uDDEC\uD83C\uDDE7 English Sub</option>';
-            html += '<option value="dub">\uD83C\uDDEC\uD83C\uDDE7 English Dub</option>';
-            return html;
-        }
         var html = '<option value="">\uD83C\uDF10 Use Settings Default</option>';
         html += '<option value="1">\uD83C\uDDE9\uD83C\uDDEA German Dub</option>';
         if (source === 'sto') {
@@ -109,9 +100,6 @@ export default function (view, params) {
         historySeriesFilter: null,
         seasonGeneration: 0,
 
-        episodeOffset: 0,
-        existingFoldersLoaded: false,
-        hiAnimeOnlyDub: false,
         aniWorldOnlyGerman: false,
 
         browseLoaded: { popular: false, new: false },
@@ -174,7 +162,7 @@ export default function (view, params) {
                 type: 'GET', dataType: 'json'
             }).catch(function () { return []; }));
 
-            // Load from s.to and hianime if enabled (uses EnabledSources endpoint)
+            // Load from s.to if enabled (uses EnabledSources endpoint)
             promises.push(ApiClient.fetch({
                 url: ApiClient.getUrl('AniWorld/EnabledSources'),
                 type: 'GET', dataType: 'json'
@@ -188,24 +176,10 @@ export default function (view, params) {
                 return [];
             }).catch(function () { return []; }));
 
-            promises.push(ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/EnabledSources'),
-                type: 'GET', dataType: 'json'
-            }).then(function (sources) {
-                if (sources.hianime) {
-                    return ApiClient.fetch({
-                        url: ApiClient.getUrl(endpoint, { source: 'hianime' }),
-                        type: 'GET', dataType: 'json'
-                    }).catch(function () { return []; });
-                }
-                return [];
-            }).catch(function () { return []; }));
-
             Promise.all(promises).then(function (results) {
                 AW.browseLoaded[section] = true;
                 AW['browseCache_aniworld_' + section] = results[0] || [];
                 AW['browseCache_sto_' + section] = results[1] || [];
-                AW['browseCache_hianime_' + section] = results[2] || [];
                 AW._renderBrowseCombined(section, container);
             }).catch(function (err) {
                 container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">❌</div>Failed to load: ' + esc(err.message || 'Unknown error') + '</div>';
@@ -215,10 +189,9 @@ export default function (view, params) {
         _renderBrowseCombined: function (section, container) {
             var awItems = this['browseCache_aniworld_' + section] || [];
             var stoItems = this['browseCache_sto_' + section] || [];
-            var hiItems = this['browseCache_hianime_' + section] || [];
             var html = '';
 
-            if (awItems.length === 0 && stoItems.length === 0 && hiItems.length === 0) {
+            if (awItems.length === 0 && stoItems.length === 0) {
                 container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No content found.</div>';
                 return;
             }
@@ -226,11 +199,6 @@ export default function (view, params) {
             if (awItems.length > 0) {
                 html += '<div class="aw-browse-section-title">AniWorld</div>';
                 html += this._buildBrowseGrid(awItems, 'aniworld');
-            }
-
-            if (hiItems.length > 0) {
-                html += '<div class="aw-browse-section-title">HiAnime</div>';
-                html += this._buildBrowseGrid(hiItems, 'hianime');
             }
 
             if (stoItems.length > 0) {
@@ -247,12 +215,8 @@ export default function (view, params) {
                 var itemSource = item.Source || source || 'aniworld';
                 html += '<div class="aw-browse-card" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\', \'' + escJs(itemSource) + '\')">';
                 html += '<img class="aw-browse-cover" src="' + esc(item.CoverImageUrl) + '" alt="' + esc(item.Title) + '" loading="lazy" onerror="this.style.display=\'none\'" />';
-                if (itemSource === 'hianime') {
-                    html += '<span class="aw-browse-source-badge aw-badge-hianime"><img src="' + siteLogoUrl(itemSource) + '" onerror="this.parentNode.style.display=\'none\'" /></span>';
-                } else {
-                    var badgeCls = 'aw-browse-source-badge' + (itemSource === 'aniworld' ? ' aw-badge-aniworld' : '');
-                    html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(itemSource) + '" onerror="this.style.display=\'none\'" />';
-                }
+                var badgeCls = 'aw-browse-source-badge' + (itemSource === 'aniworld' ? ' aw-badge-aniworld' : '');
+                html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(itemSource) + '" onerror="this.style.display=\'none\'" />';
                 html += '<div class="aw-browse-info">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
                 if (item.Genre) {
@@ -312,12 +276,8 @@ export default function (view, params) {
                 var cardId = 'aw-sr-' + idx;
                 html += '<div class="aw-browse-card" id="' + cardId + '" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\', \'' + escJs(source) + '\')">';
                 html += '<div class="aw-browse-cover aw-cover-placeholder" id="' + cardId + '-cover"></div>';
-                if (source === 'hianime') {
-                    html += '<span class="aw-browse-source-badge aw-badge-hianime"><img src="' + siteLogoUrl(source) + '" onerror="this.parentNode.style.display=\'none\'" /></span>';
-                } else {
-                    var badgeCls = 'aw-browse-source-badge' + (source === 'aniworld' ? ' aw-badge-aniworld' : '');
-                    html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" />';
-                }
+                var badgeCls = 'aw-browse-source-badge' + (source === 'aniworld' ? ' aw-badge-aniworld' : '');
+                html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" />';
                 html += '<div class="aw-browse-info">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
                 html += '</div></div>';
@@ -357,8 +317,6 @@ export default function (view, params) {
             var url = decodeURIComponent(encodedUrl);
             this.currentSeriesUrl = url;
             this.currentSeriesSource = source || 'aniworld';
-            this.existingFoldersLoaded = false;
-            this.episodeOffset = 0;
 
             // If called from browse tab, switch to search tab to show the detail view
             var browseTab = view.querySelector('#browseTab');
@@ -394,17 +352,12 @@ export default function (view, params) {
                 html += '<div class="aw-warning">\u26A0\uFE0F For anime, using AniWorld as source is recommended.</div>';
             }
 
-            if (source === 'hianime') {
-                html += '<div class="aw-warning">\u26A0\uFE0F HiAnime is not recommended. Only use it for English dub or if AniWorld does not have the anime you are looking for. Each HiAnime entry maps to Season 01, so search for the specific season you want.</div>';
-            }
-
             html += '<div class="aw-series">';
             if (series.CoverImageUrl) {
                 html += '<img class="aw-cover" src="' + esc(series.CoverImageUrl) + '" alt="Cover" onerror="this.style.display=\'none\'" />';
             }
             html += '<div class="aw-meta">';
-            var logoClass = source === 'hianime' ? 'aw-source-logo-wide' : 'aw-source-logo';
-            html += '<h2><img class="' + logoClass + '" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" style="height:1.3em"> ' + esc(series.Title) + '</h2>';
+            html += '<h2><img class="aw-source-logo" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" style="height:1.3em"> ' + esc(series.Title) + '</h2>';
 
             if (series.Genres && series.Genres.length > 0) {
                 html += '<div class="aw-genres">';
@@ -429,7 +382,7 @@ export default function (view, params) {
                 html += '<div class="aw-seasons">';
                 series.Seasons.forEach(function (season, idx) {
                     var cls = idx === 0 ? ' active' : '';
-                    var seasonLabel = source === 'hianime' ? 'Season' : 'Season ' + season.Number;
+                    var seasonLabel = 'Season ' + season.Number;
                     html += '<button class="aw-season' + cls + '" data-url="' + esc(season.Url) + '" onclick="window.AW.loadSeason(\'' + encodeURIComponent(season.Url) + '\', this)">' + seasonLabel + '</button>';
                 });
                 if (series.HasMovies) {
@@ -502,35 +455,12 @@ export default function (view, params) {
                 bar += '<label style="display:inline-flex;align-items:center;gap:0.3em;font-size:0.82em;cursor:pointer;opacity:0.85" title="Priority downloads are added to the front of the queue"><input type="checkbox" id="aw-priority-cb" style="cursor:pointer"> Priority</label>';
                 bar += '<label style="display:inline-flex;align-items:center;gap:0.3em;font-size:0.82em;cursor:pointer;opacity:0.85" title="Redownload episodes even if they are already flagged as downloaded"><input type="checkbox" id="aw-force-cb" style="cursor:pointer"> Force</label>';
                 bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')">\u2B07\uFE0F Download Season</button>';
-                if (AW.currentSeriesUrl && source !== 'hianime') {
+                if (AW.currentSeriesUrl) {
                     bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')">\u2B07\uFE0F Download All Seasons</button>';
                 }
                 bar += '</div>';
 
-                // HiAnime: "Download to existing title" controls
-                if (source === 'hianime') {
-                    bar += '<div class="aw-custom-target">';
-                    bar += '<label class="aw-custom-target-toggle"><input type="checkbox" id="aw-custom-target-cb" onchange="window.AW.toggleExistingTarget()"> Download to existing title</label>';
-                    bar += '<div id="aw-custom-target-notice" class="aw-custom-notice">Will be Season 01</div>';
-                    bar += '<div id="aw-custom-target-fields" style="display:none">';
-                    bar += '<select id="aw-custom-folder" onchange="window.AW.checkSeasonExists()"><option value="">-- Select folder --</option></select>';
-                    bar += '<label class="aw-custom-season-label">Season <input type="number" id="aw-custom-season" min="0" value="1" onchange="window.AW.checkSeasonExists()" oninput="window.AW.checkSeasonExists()"></label>';
-                    bar += '</div>';
-                    bar += '<div id="aw-custom-target-append" class="aw-custom-append" style="display:none"></div>';
-                    bar += '</div>';
-                }
-
                 barContainer.innerHTML = bar;
-
-                // Enforce "Only English Dub" setting for HiAnime
-                if (source === 'hianime' && AW.hiAnimeOnlyDub) {
-                    var langSel = view.querySelector('#aw-season-lang');
-                    if (langSel) {
-                        langSel.value = 'dub';
-                        langSel.disabled = true;
-                        langSel.title = 'Locked to English Dub by admin setting';
-                    }
-                }
 
                 // Enforce "Only German Sub and German Dub" setting for AniWorld
                 if (source === 'aniworld' && AW.aniWorldOnlyGerman) {
@@ -555,8 +485,8 @@ export default function (view, params) {
                 html += '<span class="aw-ep-title" id="' + epId + '-title">Loading...</span>';
                 html += '<span class="aw-ep-downloaded" id="' + epId + '-dl" style="display:none"></span>';
                 html += '<div class="aw-ep-actions">';
-                html += '<button class="aw-btn aw-btn-primary aw-btn-sm" onclick="window.AW.downloadEpisode(\'' + encodeURIComponent(ep.Url) + '\', ' + ep.Number + ')">\u2B07\uFE0F Download</button>';
-                html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.toggleProviders(\'' + encodeURIComponent(ep.Url) + '\', \'' + epId + '\', ' + ep.Number + ')">Providers</button>';
+                html += '<button class="aw-btn aw-btn-primary aw-btn-sm" onclick="window.AW.downloadEpisode(\'' + encodeURIComponent(ep.Url) + '\')">\u2B07\uFE0F Download</button>';
+                html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.toggleProviders(\'' + encodeURIComponent(ep.Url) + '\', \'' + epId + '\')">Providers</button>';
                 html += '</div>';
                 html += '</div>';
                 html += '<div id="' + epId + '-providers" class="aw-ep-providers" style="display:none"></div>';
@@ -623,7 +553,7 @@ export default function (view, params) {
         },
 
         // ── Providers ──
-        toggleProviders: function (encodedUrl, epId, episodeNumber) {
+        toggleProviders: function (encodedUrl, epId) {
             var panel = view.querySelector('#' + epId + '-providers');
             if (!panel) return;
 
@@ -647,7 +577,6 @@ export default function (view, params) {
                 var hasAny = false;
                 for (var langKey in details.ProvidersByLanguage) {
                     // Skip blocked languages based on admin settings
-                    if (source === 'hianime' && AW.hiAnimeOnlyDub && langKey !== 'dub') continue;
                     if (source === 'aniworld' && AW.aniWorldOnlyGerman && langKey === '2') continue;
 
                     hasAny = true;
@@ -656,7 +585,7 @@ export default function (view, params) {
                     html += '<div class="aw-provider-btns">';
                     var providers = details.ProvidersByLanguage[langKey];
                     for (var prov in providers) {
-                        html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.downloadWithOptions(\'' + encodeURIComponent(url) + '\', \'' + escJs(langKey) + '\', \'' + escJs(prov) + '\', ' + episodeNumber + ')">' + esc(prov) + '</button>';
+                        html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.downloadWithOptions(\'' + encodeURIComponent(url) + '\', \'' + escJs(langKey) + '\', \'' + escJs(prov) + '\')">' + esc(prov) + '</button>';
                     }
                     html += '</div></div>';
                 }
@@ -669,130 +598,6 @@ export default function (view, params) {
             }).catch(function () {
                 panel.innerHTML = '<div style="color:#ef5350;padding:0.5em">Failed to load providers.</div>';
             });
-        },
-
-        // ── Custom Target (HiAnime) ──
-        toggleExistingTarget: function () {
-            var cb = view.querySelector('#aw-custom-target-cb');
-            var fields = view.querySelector('#aw-custom-target-fields');
-            var notice = view.querySelector('#aw-custom-target-notice');
-            var append = view.querySelector('#aw-custom-target-append');
-            if (!cb || !fields || !notice) return;
-
-            if (cb.checked) {
-                fields.style.display = '';
-                notice.style.display = 'none';
-                if (append) append.style.display = 'none';
-                this.episodeOffset = 0;
-                this._renumberEpisodes(0);
-                if (!this.existingFoldersLoaded) {
-                    this.loadExistingFolders();
-                }
-                this.checkSeasonExists();
-            } else {
-                fields.style.display = 'none';
-                notice.style.display = '';
-                if (append) append.style.display = 'none';
-                this.episodeOffset = 0;
-                this._renumberEpisodes(0);
-            }
-        },
-
-        loadExistingFolders: function () {
-            var self = this;
-            ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/ExistingFolders', { source: 'hianime' }),
-                type: 'GET',
-                dataType: 'json'
-            }).then(function (folders) {
-                var select = view.querySelector('#aw-custom-folder');
-                if (!select) return;
-                select.innerHTML = '<option value="">-- Select folder --</option>';
-                (folders || []).forEach(function (name) {
-                    var opt = document.createElement('option');
-                    opt.value = name;
-                    opt.textContent = name;
-                    select.appendChild(opt);
-                });
-                self.existingFoldersLoaded = true;
-            }).catch(function () {
-                var select = view.querySelector('#aw-custom-folder');
-                if (select) select.innerHTML = '<option value="">Failed to load folders</option>';
-            });
-        },
-
-        checkSeasonExists: function () {
-            var folder = (view.querySelector('#aw-custom-folder') || {}).value;
-            var seasonInput = view.querySelector('#aw-custom-season');
-            var season = seasonInput ? parseInt(seasonInput.value, 10) : NaN;
-            var append = view.querySelector('#aw-custom-target-append');
-
-            if (!folder || isNaN(season) || season < 0) {
-                if (append) append.style.display = 'none';
-                this.episodeOffset = 0;
-                this._renumberEpisodes(0);
-                return;
-            }
-
-            var self = this;
-            ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/SeasonInfo', { folder: folder, season: season, source: 'hianime' }),
-                type: 'GET',
-                dataType: 'json'
-            }).then(function (info) {
-                if (info && info.exists && info.highestEpisode > 0) {
-                    self.episodeOffset = info.highestEpisode;
-                    if (append) {
-                        var sLabel = 'Season ' + (season < 10 ? '0' : '') + season;
-                        append.textContent = sLabel + ' already has ' + info.highestEpisode + ' episode(s) \u2014 new episodes will start at E' + (info.highestEpisode + 1);
-                        append.style.display = '';
-                    }
-                    self._renumberEpisodes(info.highestEpisode);
-                } else {
-                    self.episodeOffset = 0;
-                    if (append) append.style.display = 'none';
-                    self._renumberEpisodes(0);
-                }
-            }).catch(function () {
-                self.episodeOffset = 0;
-                if (append) append.style.display = 'none';
-                self._renumberEpisodes(0);
-            });
-        },
-
-        _renumberEpisodes: function (offset) {
-            var nums = view.querySelectorAll('.aw-ep-num');
-            for (var i = 0; i < nums.length; i++) {
-                var el = nums[i];
-                // Store original number on first call
-                if (!el.dataset.origNum) {
-                    el.dataset.origNum = el.textContent.trim();
-                }
-                var orig = parseInt(el.dataset.origNum, 10);
-                if (!isNaN(orig)) {
-                    el.textContent = orig + offset;
-                }
-            }
-        },
-
-        _getHiAnimeCustomTarget: function () {
-            var cb = view.querySelector('#aw-custom-target-cb');
-            if (!cb || !cb.checked) return null;
-
-            var folder = (view.querySelector('#aw-custom-folder') || {}).value;
-            var seasonInput = view.querySelector('#aw-custom-season');
-            var season = seasonInput ? parseInt(seasonInput.value, 10) : NaN;
-
-            if (!folder) {
-                Dashboard.alert('Please select a target folder.');
-                return false;
-            }
-            if (isNaN(season) || season < 0) {
-                Dashboard.alert('Please enter a valid season number (>= 0).');
-                return false;
-            }
-
-            return { folder: folder, season: season, offset: this.episodeOffset };
         },
 
         // ── Downloads ──
@@ -814,29 +619,23 @@ export default function (view, params) {
             return false;
         },
 
-        downloadEpisode: function (encodedUrl, episodeNumber) {
+        downloadEpisode: function (encodedUrl) {
             if (this._checkMaintenance()) return;
             var url = decodeURIComponent(encodedUrl);
             var langSelect = view.querySelector('#aw-season-lang');
             var lang = (langSelect && langSelect.value) ? langSelect.value : null;
-            var customTarget = this._getHiAnimeCustomTarget();
-            if (customTarget === false) return;
-            this._startDownload(url, lang, null, episodeNumber, customTarget);
+            this._startDownload(url, lang, null);
         },
 
-        downloadWithOptions: function (encodedUrl, langKey, provider, episodeNumber) {
+        downloadWithOptions: function (encodedUrl, langKey, provider) {
             if (this._checkMaintenance()) return;
             var url = decodeURIComponent(encodedUrl);
-            var customTarget = this._getHiAnimeCustomTarget();
-            if (customTarget === false) return;
-            this._startDownload(url, langKey, provider, episodeNumber, customTarget);
+            this._startDownload(url, langKey, provider);
         },
 
         downloadSeason: function (encodedSeasonUrl) {
             if (this._checkMaintenance()) return;
             var seasonUrl = decodeURIComponent(encodedSeasonUrl);
-            var customTarget = this._getHiAnimeCustomTarget();
-            if (customTarget === false) return;
 
             var body = {
                 SeasonUrl: seasonUrl,
@@ -846,12 +645,6 @@ export default function (view, params) {
 
             if (this._isPriorityChecked()) body.Priority = true;
             if (this._isForceChecked()) body.Force = true;
-
-            if (customTarget) {
-                body.CustomFolder = customTarget.folder;
-                body.CustomSeason = customTarget.season;
-                body.EpisodeOffset = customTarget.offset;
-            }
 
             var langSelect = view.querySelector('#aw-season-lang');
             if (langSelect && langSelect.value) {
@@ -880,8 +673,6 @@ export default function (view, params) {
         downloadAllSeasons: function (encodedSeriesUrl) {
             if (this._checkMaintenance()) return;
             var seriesUrl = decodeURIComponent(encodedSeriesUrl);
-            var customTarget = this._getHiAnimeCustomTarget();
-            if (customTarget === false) return;
 
             var body = {
                 SeriesUrl: seriesUrl,
@@ -891,12 +682,6 @@ export default function (view, params) {
 
             if (this._isPriorityChecked()) body.Priority = true;
             if (this._isForceChecked()) body.Force = true;
-
-            if (customTarget) {
-                body.CustomFolder = customTarget.folder;
-                body.CustomSeason = customTarget.season;
-                body.EpisodeOffset = customTarget.offset;
-            }
 
             var langSelect = view.querySelector('#aw-season-lang');
             if (langSelect && langSelect.value) {
@@ -925,7 +710,7 @@ export default function (view, params) {
             });
         },
 
-        _startDownload: function (episodeUrl, langKey, provider, episodeNumber, customTarget) {
+        _startDownload: function (episodeUrl, langKey, provider) {
             var body = {
                 EpisodeUrl: episodeUrl,
                 SeriesTitle: this.currentSeriesTitle,
@@ -933,14 +718,8 @@ export default function (view, params) {
             };
             if (langKey) body.LanguageKey = langKey;
             if (provider) body.Provider = provider;
-            if (episodeNumber != null) body.EpisodeNumber = episodeNumber;
             if (this._isPriorityChecked()) body.Priority = true;
             if (this._isForceChecked()) body.Force = true;
-            if (customTarget) {
-                body.CustomFolder = customTarget.folder;
-                body.CustomSeason = customTarget.season;
-                body.EpisodeOffset = customTarget.offset;
-            }
 
             ApiClient.fetch({
                 url: ApiClient.getUrl('AniWorld/Download'),
@@ -1273,8 +1052,6 @@ export default function (view, params) {
         goBack: function () {
             this.currentSeriesUrl = null;
             this.currentSeriesSource = null;
-            this.existingFoldersLoaded = false;
-            this.episodeOffset = 0;
             if (this.browseReturnTo) {
                 this.switchTab('browse');
                 this.browseReturnTo = null;
@@ -1298,7 +1075,6 @@ export default function (view, params) {
         type: 'GET',
         dataType: 'json'
     }).then(function (sources) {
-        AW.hiAnimeOnlyDub = sources.hiAnimeOnlyDub === true;
         AW.aniWorldOnlyGerman = sources.aniWorldOnlyGerman === true;
         AW.maintenanceMode = sources.maintenanceMode === true;
         if (AW.maintenanceMode) {

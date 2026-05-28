@@ -29,7 +29,6 @@ public class AniWorldController : ControllerBase
 {
     private readonly AniWorldService _aniWorldService;
     private readonly StoService _stoService;
-    private readonly HiAnimeService _hiAnimeService;
     private readonly DownloadService _downloadService;
     private readonly DownloadHistoryService _historyService;
     private readonly IServerConfigurationManager _configManager;
@@ -41,7 +40,6 @@ public class AniWorldController : ControllerBase
     public AniWorldController(
         AniWorldService aniWorldService,
         StoService stoService,
-        HiAnimeService hiAnimeService,
         DownloadService downloadService,
         DownloadHistoryService historyService,
         IServerConfigurationManager configManager,
@@ -49,7 +47,6 @@ public class AniWorldController : ControllerBase
     {
         _aniWorldService = aniWorldService;
         _stoService = stoService;
-        _hiAnimeService = hiAnimeService;
         _downloadService = downloadService;
         _historyService = historyService;
         _configManager = configManager;
@@ -149,9 +146,6 @@ public class AniWorldController : ControllerBase
         {
             aniworld = config?.AniWorldConfig.Enabled ?? true,
             sto = config?.StoConfig.Enabled ?? false,
-            // NOTE: HiAnime (hianime.to) has been shut down — always disabled
-            hianime = false,
-            hiAnimeOnlyDub = config?.HiAnimeConfig.OnlyEnglishDub ?? false,
             aniWorldOnlyGerman = config?.AniWorldConfig.OnlyGermanLanguages ?? false,
             maintenanceMode = config?.MaintenanceMode ?? false,
             maintenanceMessage = config?.MaintenanceMessage ?? string.Empty
@@ -202,26 +196,7 @@ public class AniWorldController : ControllerBase
                 }
             }
 
-            if (config?.HiAnimeConfig.Enabled != false)
-            {
-                try
-                {
-                    var hiResults = await _hiAnimeService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
-                    results.AddRange(hiResults);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "HiAnime search failed for query: {Query}", query);
-                }
-            }
-
             return Ok(results);
-        }
-
-        if (string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase))
-        {
-            var hiResults = await _hiAnimeService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
-            return Ok(hiResults);
         }
 
         var service = GetService(source);
@@ -246,12 +221,6 @@ public class AniWorldController : ControllerBase
         }
 
         var resolvedSource = ResolveSource(source, url);
-        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
-        {
-            var info = await _hiAnimeService.GetSeriesInfoAsync(url, cancellationToken).ConfigureAwait(false);
-            return Ok(info);
-        }
-
         var service = GetService(resolvedSource);
         var result = await service.GetSeriesInfoAsync(url, cancellationToken).ConfigureAwait(false);
         return Ok(result);
@@ -274,12 +243,6 @@ public class AniWorldController : ControllerBase
         }
 
         var resolvedSource = ResolveSource(source, url);
-        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
-        {
-            var episodes = await _hiAnimeService.GetEpisodesAsync(url, cancellationToken).ConfigureAwait(false);
-            return Ok(episodes);
-        }
-
         var service = GetService(resolvedSource);
         var result = await service.GetEpisodesAsync(url, cancellationToken).ConfigureAwait(false);
         return Ok(result);
@@ -302,12 +265,6 @@ public class AniWorldController : ControllerBase
         }
 
         var resolvedSource = ResolveSource(source, url);
-        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
-        {
-            var details = await _hiAnimeService.GetEpisodeDetailsAsync(url, cancellationToken).ConfigureAwait(false);
-            return Ok(details);
-        }
-
         var service = GetService(resolvedSource);
         var result = await service.GetEpisodeDetailsAsync(url, cancellationToken).ConfigureAwait(false);
         return Ok(result);
@@ -323,12 +280,6 @@ public class AniWorldController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var resolvedSource = ResolveSource(source);
-        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
-        {
-            var items = await _hiAnimeService.GetPopularAsync(cancellationToken).ConfigureAwait(false);
-            return Ok(items);
-        }
-
         var service = GetService(resolvedSource);
         var result = await service.GetPopularAsync(cancellationToken).ConfigureAwait(false);
         return Ok(result);
@@ -344,88 +295,9 @@ public class AniWorldController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var resolvedSource = ResolveSource(source);
-        if (string.Equals(resolvedSource, "hianime", StringComparison.OrdinalIgnoreCase))
-        {
-            var items = await _hiAnimeService.GetNewReleasesAsync(cancellationToken).ConfigureAwait(false);
-            return Ok(items);
-        }
-
         var service = GetService(resolvedSource);
         var result = await service.GetNewReleasesAsync(cancellationToken).ConfigureAwait(false);
         return Ok(result);
-    }
-
-    // ── Custom Target (HiAnime) ──────────────────────────────────────
-
-    /// <summary>
-    /// Lists existing series folders in the configured download path.
-    /// </summary>
-    [HttpGet("ExistingFolders")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<List<string>> GetExistingFolders(string? source = null)
-    {
-        var resolvedSource = string.IsNullOrEmpty(source) ? "hianime" : source;
-        var config = Plugin.Instance?.Configuration;
-        var allPaths = config?.GetAllDownloadPaths(resolvedSource) ?? new List<string>();
-
-        var folderSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var basePath in allPaths)
-        {
-            if (!Directory.Exists(basePath))
-            {
-                continue;
-            }
-
-            foreach (var dir in Directory.GetDirectories(basePath))
-            {
-                var name = Path.GetFileName(dir);
-                if (!string.IsNullOrEmpty(name))
-                {
-                    folderSet.Add(name);
-                }
-            }
-        }
-
-        var folders = folderSet.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
-        return Ok(folders);
-    }
-
-    /// <summary>
-    /// Returns info about a specific season folder (whether it exists and highest episode number).
-    /// </summary>
-    [HttpGet("SeasonInfo")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult GetSeasonInfo(
-        [Required] string folder,
-        [Required] int season,
-        string? source = null)
-    {
-        if (folder.Contains('/') || folder.Contains('\\'))
-        {
-            return BadRequest("Folder name must not contain path separators.");
-        }
-
-        if (season < 0)
-        {
-            return BadRequest("Season number must be >= 0.");
-        }
-
-        var resolvedSource = string.IsNullOrEmpty(source) ? "hianime" : source;
-        var config = Plugin.Instance?.Configuration;
-        var allPaths = config?.GetAllDownloadPaths(resolvedSource) ?? new List<string>();
-
-        var highest = 0;
-        foreach (var basePath in allPaths)
-        {
-            var h = PathHelper.GetHighestEpisodeNumber(basePath, folder, season);
-            if (h > highest)
-            {
-                highest = h;
-            }
-        }
-
-        return Ok(new { exists = highest > 0, highestEpisode = highest });
     }
 
     // ── Downloads ───────────────────────────────────────────────────
@@ -460,16 +332,10 @@ public class AniWorldController : ControllerBase
 
         var source = ResolveSource(request.Source, request.EpisodeUrl);
         var config = Plugin.Instance?.Configuration;
-        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
-        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? "1";
 
         // Enforce language restrictions — reject blocked languages
-        if (isHiAnime && config?.HiAnimeConfig.OnlyEnglishDub == true && language != "dub")
-        {
-            return BadRequest("Only English Dub downloads are allowed for HiAnime. This language is blocked by the admin.");
-        }
-
-        if (!isHiAnime && string.Equals(source, "aniworld", StringComparison.OrdinalIgnoreCase)
+        if (string.Equals(source, "aniworld", StringComparison.OrdinalIgnoreCase)
             && config?.AniWorldConfig.OnlyGermanLanguages == true && language == "2")
         {
             return BadRequest("English Sub downloads are blocked for AniWorld. Only German Dub and German Sub are allowed.");
@@ -483,53 +349,15 @@ public class AniWorldController : ControllerBase
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
         }
 
-        var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
+        var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
         var seriesTitle = request.SeriesTitle ?? "Unknown";
 
-        // Validate custom target parameters
-        var useCustomTarget = isHiAnime && !string.IsNullOrEmpty(request.CustomFolder) && request.CustomSeason.HasValue;
-        if (useCustomTarget)
-        {
-            if (request.CustomFolder!.Contains('/') || request.CustomFolder.Contains('\\'))
-            {
-                return BadRequest("Custom folder name must not contain path separators.");
-            }
-
-            if (request.CustomSeason!.Value < 0)
-            {
-                return BadRequest("Custom season number must be >= 0.");
-            }
-
-            if (request.EpisodeOffset.HasValue && request.EpisodeOffset.Value < 0)
-            {
-                return BadRequest("Episode offset must be >= 0.");
-            }
-        }
-
-        string outputPath;
-        int? effectiveEpisodeNumber = request.EpisodeNumber;
-        int? customSeason = null;
-
-        if (useCustomTarget)
-        {
-            var offset = request.EpisodeOffset ?? 0;
-            var epNum = (request.EpisodeNumber ?? 1) + offset;
-            effectiveEpisodeNumber = epNum;
-            customSeason = request.CustomSeason!.Value;
-            outputPath = PathHelper.BuildOutputPathCustom(basePath, request.CustomFolder!, customSeason.Value, epNum);
-            seriesTitle = request.CustomFolder!;
-        }
-        else
-        {
-            outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl, request.EpisodeNumber);
-        }
+        var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl);
 
         // Check if already downloaded (duplicate detection)
         if (!request.Force)
         {
-            var (checkSeason, checkEpisode) = useCustomTarget
-                ? (request.CustomSeason!.Value, (request.EpisodeNumber ?? 1) + (request.EpisodeOffset ?? 0))
-                : PathHelper.ParseSeasonEpisode(request.EpisodeUrl, request.EpisodeNumber);
+            var (checkSeason, checkEpisode) = PathHelper.ParseSeasonEpisode(request.EpisodeUrl);
 
             if (_downloadService.IsAlreadyDownloaded(seriesTitle, checkSeason, checkEpisode, language))
             {
@@ -547,8 +375,6 @@ public class AniWorldController : ControllerBase
             seriesTitle,
             source,
             cancellationToken,
-            effectiveEpisodeNumber,
-            customSeason,
             username,
             request.Priority).ConfigureAwait(false);
 
@@ -591,16 +417,10 @@ public class AniWorldController : ControllerBase
 
         var source = ResolveSource(request.Source, request.SeasonUrl);
         var config = Plugin.Instance?.Configuration;
-        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
-        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? "1";
 
         // Enforce language restrictions — reject blocked languages
-        if (isHiAnime && config?.HiAnimeConfig.OnlyEnglishDub == true && language != "dub")
-        {
-            return BadRequest("Only English Dub downloads are allowed for HiAnime. This language is blocked by the admin.");
-        }
-
-        if (!isHiAnime && string.Equals(source, "aniworld", StringComparison.OrdinalIgnoreCase)
+        if (string.Equals(source, "aniworld", StringComparison.OrdinalIgnoreCase)
             && config?.AniWorldConfig.OnlyGermanLanguages == true && language == "2")
         {
             return BadRequest("English Sub downloads are blocked for AniWorld. Only German Dub and German Sub are allowed.");
@@ -609,41 +429,11 @@ public class AniWorldController : ControllerBase
         var basePath = config?.GetDownloadPath(source, language) ?? string.Empty;
         var movieBasePath = config?.GetDownloadPath(source, language, true) ?? string.Empty;
 
-        var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
+        var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
         var seriesTitle = request.SeriesTitle ?? "Unknown";
 
-        // Validate custom target parameters
-        var useCustomTarget = isHiAnime && !string.IsNullOrEmpty(request.CustomFolder) && request.CustomSeason.HasValue;
-        if (useCustomTarget)
-        {
-            if (request.CustomFolder!.Contains('/') || request.CustomFolder.Contains('\\'))
-            {
-                return BadRequest("Custom folder name must not contain path separators.");
-            }
-
-            if (request.CustomSeason!.Value < 0)
-            {
-                return BadRequest("Custom season number must be >= 0.");
-            }
-
-            if (request.EpisodeOffset.HasValue && request.EpisodeOffset.Value < 0)
-            {
-                return BadRequest("Episode offset must be >= 0.");
-            }
-
-            seriesTitle = request.CustomFolder!;
-        }
-
-        List<EpisodeRef> episodes;
-        if (isHiAnime)
-        {
-            episodes = await _hiAnimeService.GetEpisodesAsync(request.SeasonUrl, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            var service = GetService(source);
-            episodes = await service.GetEpisodesAsync(request.SeasonUrl, cancellationToken).ConfigureAwait(false);
-        }
+        var service = GetService(source);
+        var episodes = await service.GetEpisodesAsync(request.SeasonUrl, cancellationToken).ConfigureAwait(false);
 
         if (episodes.Count == 0)
         {
@@ -653,7 +443,7 @@ public class AniWorldController : ControllerBase
         var hasRegularEpisodes = episodes.Any(e => !e.IsMovie);
         var hasMovieEpisodes = episodes.Any(e => e.IsMovie);
 
-        if ((useCustomTarget || hasRegularEpisodes) && string.IsNullOrEmpty(basePath))
+        if (hasRegularEpisodes && string.IsNullOrEmpty(basePath))
         {
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
         }
@@ -664,42 +454,24 @@ public class AniWorldController : ControllerBase
         }
 
         var tasks = new List<DownloadTask>();
-        var offset = useCustomTarget ? (request.EpisodeOffset ?? 0) : 0;
         var username = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
 
         foreach (var ep in episodes)
         {
-            string outputPath;
-            int? effectiveEpNum = isHiAnime ? ep.Number : null;
-            int? customSeason = null;
+            var effectiveBasePath = ep.IsMovie
+                ? movieBasePath
+                : basePath;
 
-            if (useCustomTarget)
+            if (string.IsNullOrEmpty(effectiveBasePath))
             {
-                var epNum = ep.Number + offset;
-                effectiveEpNum = epNum;
-                customSeason = request.CustomSeason!.Value;
-                outputPath = PathHelper.BuildOutputPathCustom(basePath, request.CustomFolder!, customSeason.Value, epNum);
-            }
-            else
-            {
-                var effectiveBasePath = ep.IsMovie
-                    ? movieBasePath
-                    : basePath;
-
-                if (string.IsNullOrEmpty(effectiveBasePath))
-                {
-                    continue;
-                }
-
-                outputPath = PathHelper.BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url, effectiveEpNum);
+                continue;
             }
 
-            var (checkSeason, checkEpisode) = useCustomTarget
-                ? (request.CustomSeason!.Value, ep.Number + offset)
-                : PathHelper.ParseSeasonEpisode(ep.Url, effectiveEpNum);
-            var checkTitle = useCustomTarget ? request.CustomFolder! : seriesTitle;
+            var outputPath = PathHelper.BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url);
 
-            if (!request.Force && _downloadService.IsAlreadyDownloaded(checkTitle, checkSeason, checkEpisode, language))
+            var (checkSeason, checkEpisode) = PathHelper.ParseSeasonEpisode(ep.Url);
+
+            if (!request.Force && _downloadService.IsAlreadyDownloaded(seriesTitle, checkSeason, checkEpisode, language))
             {
                 continue;
             }
@@ -712,8 +484,6 @@ public class AniWorldController : ControllerBase
                 seriesTitle,
                 source,
                 cancellationToken,
-                effectiveEpNum,
-                customSeason,
                 username,
                 request.Priority).ConfigureAwait(false);
 
@@ -759,16 +529,10 @@ public class AniWorldController : ControllerBase
 
         var source = ResolveSource(request.Source, request.SeriesUrl);
         var config = Plugin.Instance?.Configuration;
-        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
-        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? (isHiAnime ? "sub" : "1");
+        var language = request.LanguageKey ?? config?.GetPreferredLanguage(source) ?? "1";
 
         // Enforce language restrictions — reject blocked languages
-        if (isHiAnime && config?.HiAnimeConfig.OnlyEnglishDub == true && language != "dub")
-        {
-            return BadRequest("Only English Dub downloads are allowed for HiAnime. This language is blocked by the admin.");
-        }
-
-        if (!isHiAnime && string.Equals(source, "aniworld", StringComparison.OrdinalIgnoreCase)
+        if (string.Equals(source, "aniworld", StringComparison.OrdinalIgnoreCase)
             && config?.AniWorldConfig.OnlyGermanLanguages == true && language == "2")
         {
             return BadRequest("English Sub downloads are blocked for AniWorld. Only German Dub and German Sub are allowed.");
@@ -782,39 +546,11 @@ public class AniWorldController : ControllerBase
             return BadRequest("No download path configured. Please set a download path in the plugin settings.");
         }
 
-        var provider = request.Provider ?? (isHiAnime ? "Auto" : config?.GetPreferredProvider(source) ?? "VOE");
+        var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
 
-        // Validate custom target parameters
-        var useCustomTarget = isHiAnime && !string.IsNullOrEmpty(request.CustomFolder) && request.CustomSeason.HasValue;
-        if (useCustomTarget)
-        {
-            if (request.CustomFolder!.Contains('/') || request.CustomFolder.Contains('\\'))
-            {
-                return BadRequest("Custom folder name must not contain path separators.");
-            }
-
-            if (request.CustomSeason!.Value < 0)
-            {
-                return BadRequest("Custom season number must be >= 0.");
-            }
-
-            if (request.EpisodeOffset.HasValue && request.EpisodeOffset.Value < 0)
-            {
-                return BadRequest("Episode offset must be >= 0.");
-            }
-        }
-
-        SeriesInfo seriesInfo;
-        if (isHiAnime)
-        {
-            seriesInfo = await _hiAnimeService.GetSeriesInfoAsync(request.SeriesUrl, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            var service = GetService(source);
-            seriesInfo = await service.GetSeriesInfoAsync(request.SeriesUrl, cancellationToken).ConfigureAwait(false);
-        }
-        var seriesTitle = useCustomTarget ? request.CustomFolder! : (request.SeriesTitle ?? seriesInfo.Title ?? "Unknown");
+        var service = GetService(source);
+        var seriesInfo = await service.GetSeriesInfoAsync(request.SeriesUrl, cancellationToken).ConfigureAwait(false);
+        var seriesTitle = request.SeriesTitle ?? seriesInfo.Title ?? "Unknown";
 
         if (seriesInfo.Seasons == null || seriesInfo.Seasons.Count == 0)
         {
@@ -823,50 +559,23 @@ public class AniWorldController : ControllerBase
 
         var allTasks = new List<DownloadTask>();
         var skippedCount = 0;
-        var offset = useCustomTarget ? (request.EpisodeOffset ?? 0) : 0;
         var username = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
 
         foreach (var season in seriesInfo.Seasons)
         {
-            List<EpisodeRef> episodes;
-            if (isHiAnime)
-            {
-                episodes = await _hiAnimeService.GetEpisodesAsync(season.Url, cancellationToken).ConfigureAwait(false);
-            }
-            else
-            {
-                var svc = GetService(source);
-                episodes = await svc.GetEpisodesAsync(season.Url, cancellationToken).ConfigureAwait(false);
-            }
+            var episodes = await service.GetEpisodesAsync(season.Url, cancellationToken).ConfigureAwait(false);
 
             foreach (var ep in episodes)
             {
-                string outputPath;
-                int? effectiveEpNum = isHiAnime ? ep.Number : null;
-                int? customSeason = null;
+                var effectiveBasePath = ep.IsMovie
+                    ? movieBasePath
+                    : basePath;
 
-                if (useCustomTarget)
-                {
-                    var epNum = ep.Number + offset;
-                    effectiveEpNum = epNum;
-                    customSeason = request.CustomSeason!.Value;
-                    outputPath = PathHelper.BuildOutputPathCustom(basePath, request.CustomFolder!, customSeason.Value, epNum);
-                }
-                else
-                {
-                    var effectiveBasePath = ep.IsMovie
-                        ? movieBasePath
-                        : basePath;
+                var outputPath = PathHelper.BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url);
 
-                    outputPath = PathHelper.BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url, effectiveEpNum);
-                }
+                var (checkSeason, checkEpisode) = PathHelper.ParseSeasonEpisode(ep.Url);
 
-                var (checkSeason, checkEpisode) = useCustomTarget
-                    ? (request.CustomSeason!.Value, ep.Number + offset)
-                    : PathHelper.ParseSeasonEpisode(ep.Url, effectiveEpNum);
-                var checkTitle = useCustomTarget ? request.CustomFolder! : seriesTitle;
-
-                if (!request.Force && _downloadService.IsAlreadyDownloaded(checkTitle, checkSeason, checkEpisode, language))
+                if (!request.Force && _downloadService.IsAlreadyDownloaded(seriesTitle, checkSeason, checkEpisode, language))
                 {
                     skippedCount++;
                     continue;
@@ -880,8 +589,6 @@ public class AniWorldController : ControllerBase
                     seriesTitle,
                     source,
                     cancellationToken,
-                    effectiveEpNum,
-                    customSeason,
                     username,
                     request.Priority).ConfigureAwait(false);
 
@@ -895,8 +602,8 @@ public class AniWorldController : ControllerBase
             }
         }
 
-        // Also handle movies if they exist (not applicable for hianime)
-        if (seriesInfo.HasMovies && !isHiAnime)
+        // Also handle movies if they exist
+        if (seriesInfo.HasMovies)
         {
             var movieUrl = request.SeriesUrl.TrimEnd('/') + "/filme";
             var svc = GetService(source);
@@ -1083,30 +790,16 @@ public class AniWorldController : ControllerBase
     public ActionResult GetFlag(string lang, string? source = null)
     {
         var isSto = string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase);
-        var isHiAnime = string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase);
 
-        string? resourceName;
-        if (isHiAnime)
+        string? resourceName = lang switch
         {
-            resourceName = lang switch
-            {
-                "sub" => "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
-                "dub" => "Jellyfin.Plugin.AniWorld.Web.english.svg",
-                _ => null
-            };
-        }
-        else
-        {
-            resourceName = lang switch
-            {
-                "1" => "Jellyfin.Plugin.AniWorld.Web.german.svg",
-                "2" => isSto
-                    ? "Jellyfin.Plugin.AniWorld.Web.english.svg"
-                    : "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
-                "3" => "Jellyfin.Plugin.AniWorld.Web.japanese-german.svg",
-                _ => null
-            };
-        }
+            "1" => "Jellyfin.Plugin.AniWorld.Web.german.svg",
+            "2" => isSto
+                ? "Jellyfin.Plugin.AniWorld.Web.english.svg"
+                : "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
+            "3" => "Jellyfin.Plugin.AniWorld.Web.japanese-german.svg",
+            _ => null
+        };
 
         if (resourceName == null)
         {
@@ -1135,7 +828,6 @@ public class AniWorldController : ControllerBase
         {
             "aniworld" => "Jellyfin.Plugin.AniWorld.Web.aniworld.svg",
             "sto" => "Jellyfin.Plugin.AniWorld.Web.sto.svg",
-            "hianime" => "Jellyfin.Plugin.AniWorld.Web.hianime.svg",
             _ => null
         };
 
@@ -1204,18 +896,6 @@ public class DownloadRequest
     /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
     public string? Source { get; set; }
 
-    /// <summary>Gets or sets the sequential episode number (used for HiAnime where URL contains an internal ID, not the episode number).</summary>
-    public int? EpisodeNumber { get; set; }
-
-    /// <summary>Gets or sets the custom folder name for downloading into an existing series (HiAnime only).</summary>
-    public string? CustomFolder { get; set; }
-
-    /// <summary>Gets or sets the custom season number (HiAnime only).</summary>
-    public int? CustomSeason { get; set; }
-
-    /// <summary>Gets or sets the episode offset (highest existing episode number to offset from, HiAnime only).</summary>
-    public int? EpisodeOffset { get; set; }
-
     /// <summary>Gets or sets whether this is a priority download (added to front of queue).</summary>
     public bool Priority { get; set; }
 }
@@ -1239,15 +919,6 @@ public class BatchDownloadRequest
 
     /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
     public string? Source { get; set; }
-
-    /// <summary>Gets or sets the custom folder name for downloading into an existing series (HiAnime only).</summary>
-    public string? CustomFolder { get; set; }
-
-    /// <summary>Gets or sets the custom season number (HiAnime only).</summary>
-    public int? CustomSeason { get; set; }
-
-    /// <summary>Gets or sets the episode offset (highest existing episode number to offset from, HiAnime only).</summary>
-    public int? EpisodeOffset { get; set; }
 
     /// <summary>Gets or sets whether this is a priority download (added to front of queue).</summary>
     public bool Priority { get; set; }
@@ -1275,15 +946,6 @@ public class FullSeriesDownloadRequest
 
     /// <summary>Gets or sets the source site ("aniworld" or "sto").</summary>
     public string? Source { get; set; }
-
-    /// <summary>Gets or sets the custom folder name for downloading into an existing series (HiAnime only).</summary>
-    public string? CustomFolder { get; set; }
-
-    /// <summary>Gets or sets the custom season number (HiAnime only).</summary>
-    public int? CustomSeason { get; set; }
-
-    /// <summary>Gets or sets the episode offset (highest existing episode number to offset from, HiAnime only).</summary>
-    public int? EpisodeOffset { get; set; }
 
     /// <summary>Gets or sets whether this is a priority download (added to front of queue).</summary>
     public bool Priority { get; set; }

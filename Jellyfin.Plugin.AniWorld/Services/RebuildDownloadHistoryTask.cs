@@ -269,12 +269,6 @@ public class RebuildDownloadHistoryTask : IScheduledTask
             AddTarget(config.StoConfig.DownloadPath, config.GetPreferredLanguage("sto"), "sto");
         }
 
-        // HiAnime per-language paths
-        foreach (var (langKey, path) in config.HiAnimeConfig.DownloadPaths)
-        {
-            AddTarget(path, langKey, "hianime");
-        }
-
         // Legacy global DownloadPath
         if (!string.IsNullOrEmpty(config.DownloadPath))
         {

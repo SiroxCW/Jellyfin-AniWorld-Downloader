@@ -23,11 +23,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
         serviceCollection.AddHttpClient("STO", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
             .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
-        serviceCollection.AddHttpClient("HiAnime", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
-            .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
         serviceCollection.AddSingleton<AniWorldService>();
         serviceCollection.AddSingleton<StoService>();
-        serviceCollection.AddSingleton<HiAnimeService>();
         serviceCollection.AddSingleton<DownloadHistoryService>();
         serviceCollection.AddSingleton<DownloadService>();
         serviceCollection.AddSingleton<IStreamExtractor, VoeExtractor>();

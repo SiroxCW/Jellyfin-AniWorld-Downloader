@@ -30,7 +30,6 @@ public class DownloadService
 
     private readonly AniWorldService _aniWorldService;
     private readonly StoService _stoService;
-    private readonly HiAnimeService _hiAnimeService;
     private readonly DownloadHistoryService _historyService;
     private readonly IEnumerable<IStreamExtractor> _extractors;
     private readonly IMediaEncoder _mediaEncoder;
@@ -51,7 +50,6 @@ public class DownloadService
     public DownloadService(
         AniWorldService aniWorldService,
         StoService stoService,
-        HiAnimeService hiAnimeService,
         DownloadHistoryService historyService,
         IEnumerable<IStreamExtractor> extractors,
         IMediaEncoder mediaEncoder,
@@ -60,7 +58,6 @@ public class DownloadService
     {
         _aniWorldService = aniWorldService;
         _stoService = stoService;
-        _hiAnimeService = hiAnimeService;
         _historyService = historyService;
         _extractors = extractors;
         _mediaEncoder = mediaEncoder;
@@ -166,8 +163,6 @@ public class DownloadService
         string seriesTitle,
         string source = "aniworld",
         CancellationToken cancellationToken = default,
-        int? episodeNumber = null,
-        int? customSeason = null,
         string? username = null,
         bool priority = false)
     {
@@ -186,13 +181,7 @@ public class DownloadService
             }
 
             var taskId = Guid.NewGuid().ToString("N")[..12];
-            var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl, episodeNumber);
-
-            // Override season when a custom season is provided (HiAnime "download to existing title")
-            if (customSeason.HasValue)
-            {
-                season = customSeason.Value;
-            }
+            var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl);
 
             task = new DownloadTask
             {
@@ -472,12 +461,6 @@ public class DownloadService
     {
         token.ThrowIfCancellationRequested();
 
-        if (string.Equals(task.Source, "hianime", StringComparison.OrdinalIgnoreCase))
-        {
-            await ExecuteHiAnimeDownloadAsync(task, token).ConfigureAwait(false);
-            return;
-        }
-
         task.Status = DownloadStatus.Resolving;
         _historyService.UpdateDownload(task);
 
@@ -585,52 +568,6 @@ public class DownloadService
         }
 
         await DownloadWithFfmpegAsync(task, token).ConfigureAwait(false);
-
-        VerifyDownloadedFile(task, token);
-    }
-
-    /// <summary>
-    /// Executes the HiAnime-specific download pipeline: MegaCloud extraction with HD-2/HD-3 fallback.
-    /// </summary>
-    private async Task ExecuteHiAnimeDownloadAsync(DownloadTask task, CancellationToken token)
-    {
-        task.Status = DownloadStatus.Resolving;
-        _historyService.UpdateDownload(task);
-
-        // Get episode title
-        var details = await _hiAnimeService.GetEpisodeDetailsAsync(task.EpisodeUrl, token).ConfigureAwait(false);
-        task.EpisodeTitle = details.TitleEn ?? "Unknown";
-
-        var newPath = PathHelper.InsertEpisodeTitleInPath(task.OutputPath, task.EpisodeTitle);
-        if (newPath != task.OutputPath)
-        {
-            task.OutputPath = newPath;
-            _logger.LogDebug("Updated output path with episode title: {Path}", newPath);
-        }
-
-        token.ThrowIfCancellationRequested();
-
-        task.Status = DownloadStatus.Extracting;
-        _historyService.UpdateDownload(task);
-
-        // Full MegaCloud extraction with HD-2 -> HD-3 fallback
-        var streamResult = await _hiAnimeService.GetStreamAsync(task.EpisodeUrl, task.Language, token).ConfigureAwait(false);
-        if (streamResult == null)
-        {
-            throw new InvalidOperationException("Failed to extract stream from HiAnime (all servers failed)");
-        }
-
-        task.StreamUrl = streamResult.Url;
-        task.Status = DownloadStatus.Downloading;
-        _historyService.UpdateDownload(task);
-
-        var dir = Path.GetDirectoryName(task.OutputPath);
-        if (!string.IsNullOrEmpty(dir))
-        {
-            Directory.CreateDirectory(dir);
-        }
-
-        await DownloadWithFfmpegAsync(task, token, streamResult.Headers).ConfigureAwait(false);
 
         VerifyDownloadedFile(task, token);
     }
@@ -749,7 +686,6 @@ public class DownloadService
         // "5" = English SUB > German SUB > German DUB
         // "6" = German SUB > German DUB > English SUB
         // "7" = German SUB > English SUB > German DUB
-        // We support both AniWorld/s.to keys ("1","2","3") and HiAnime keys ("sub","dub").
 
         // Normalize config option
         if (!int.TryParse(configOption, out var opt))
@@ -757,8 +693,8 @@ public class DownloadService
             opt = 1;
         }
 
-        // Helper to return order for anime-style keys ("1"=GerDub, "2"=EngSub, "3"=GerSub)
-        string[] MapAnimeOrder(int option) => option switch
+        // Map numeric options to language-key orders ("1"=GerDub, "2"=EngSub, "3"=GerSub)
+        string[] order = opt switch
         {
             2 => [ "1", "3", "2" ],
             3 => [ "1", "2", "3" ],
@@ -769,40 +705,13 @@ public class DownloadService
             _ => Array.Empty<string>(), // "1" or unknown => no fallback
         };
 
-        // Helper to return order for hianime-style keys ("dub","sub")
-        string[] MapHiAnimeOrder(int option) => option switch
+        if (order.Length > 0 && !order.Contains(currentLanguage, StringComparer.OrdinalIgnoreCase))
         {
-            2 => [ "dub", "sub" ], // treat recommended mapping as dub->sub
-            3 => [ "dub", "sub" ],
-            4 => [ "sub", "dub" ],
-            5 => [ "sub", "dub" ],
-            6 => [ "sub", "dub" ],
-            7 => [ "sub", "dub" ],
-            _ => Array.Empty<string>(),
-        };
+            // Put requested language first so loops skip it quickly
+            order = (new[] { currentLanguage }).Concat(order).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
 
-        // Decide mapping based on the namespace of the currentLanguage
-        if (string.Equals(currentLanguage, "sub", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(currentLanguage, "dub", StringComparison.OrdinalIgnoreCase))
-        {
-            var order = MapHiAnimeOrder(opt);
-            // Ensure current language included first if config produced an order
-            if (order.Length > 0 && !order.Contains(currentLanguage, StringComparer.OrdinalIgnoreCase))
-            {
-                order = (new[] { currentLanguage }).Concat(order).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            }
-            return order;
-        }
-        else
-        {
-            var order = MapAnimeOrder(opt);
-            if (order.Length > 0 && !order.Contains(currentLanguage, StringComparer.OrdinalIgnoreCase))
-            {
-                // Put requested language first so loops skip it quickly
-                order = (new[] { currentLanguage }).Concat(order).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            }
-            return order;
-        }
+        return order;
     }
 
     /// <summary>
@@ -810,16 +719,6 @@ public class DownloadService
     /// </summary>
     private static string LanguageDisplayName(string langKey, string source)
     {
-        if (string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase))
-        {
-            return langKey switch
-            {
-                "sub" => "English Sub",
-                "dub" => "English Dub",
-                _ => langKey,
-            };
-        }
-
         if (string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase))
         {
             return langKey switch
@@ -975,8 +874,7 @@ public class DownloadService
     /// </summary>
     private async Task DownloadWithFfmpegAsync(
         DownloadTask task,
-        CancellationToken cancellationToken,
-        Dictionary<string, string>? extraHeaders = null)
+        CancellationToken cancellationToken)
     {
         var ffmpegPath = FindFfmpeg();
         if (string.IsNullOrEmpty(ffmpegPath))
@@ -1001,14 +899,6 @@ public class DownloadService
         startInfo.ArgumentList.Add("1");
         startInfo.ArgumentList.Add("-reconnect_delay_max");
         startInfo.ArgumentList.Add("5");
-
-        // Add extra headers (e.g., Referer for HiAnime/MegaCloud)
-        if (extraHeaders != null && extraHeaders.Count > 0)
-        {
-            var headerStr = string.Join("\r\n", extraHeaders.Select(h => $"{h.Key}: {h.Value}")) + "\r\n";
-            startInfo.ArgumentList.Add("-headers");
-            startInfo.ArgumentList.Add(headerStr);
-        }
 
         startInfo.ArgumentList.Add("-i");
         startInfo.ArgumentList.Add(task.StreamUrl!);

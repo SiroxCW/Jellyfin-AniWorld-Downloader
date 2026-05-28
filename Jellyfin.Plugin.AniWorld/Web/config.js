@@ -27,15 +27,6 @@ export default function (view, params) {
             view.querySelector('#selAniWorldFallback').value = aw.FallbackProvider || config.FallbackProvider || '';
             view.querySelector('#chkAniWorldOnlyGerman').checked = aw.OnlyGermanLanguages === true;
 
-            // HiAnime — disabled: hianime.to has been shut down (March 2026)
-            // Config elements are hidden but still present in the DOM for backward compat
-            var hi = config.HiAnimeConfig || {};
-            view.querySelector('#chkHiAnimeEnabled').checked = false;
-            view.querySelector('#txtHiAnimePathSub').value = hi.DownloadPathSub || hi.DownloadPath || '';
-            view.querySelector('#txtHiAnimePathDub').value = hi.DownloadPathDub || '';
-            view.querySelector('#selHiAnimeLanguage').value = hi.PreferredLanguage || 'sub';
-            view.querySelector('#chkHiAnimeOnlyDub').checked = hi.OnlyEnglishDub === true;
-
             // s.to
             var sto = config.StoConfig || {};
             var stoFallback = sto.DownloadPath || '';
@@ -82,15 +73,6 @@ export default function (view, params) {
             config.PreferredLanguage = config.AniWorldConfig.PreferredLanguage;
             config.PreferredProvider = config.AniWorldConfig.PreferredProvider;
             config.FallbackProvider = config.AniWorldConfig.FallbackProvider;
-
-            // HiAnime — disabled: hianime.to has been shut down (March 2026)
-            if (!config.HiAnimeConfig) config.HiAnimeConfig = {};
-            config.HiAnimeConfig.Enabled = false;
-            config.HiAnimeConfig.DownloadPathSub = view.querySelector('#txtHiAnimePathSub').value.trim();
-            config.HiAnimeConfig.DownloadPathDub = view.querySelector('#txtHiAnimePathDub').value.trim();
-            config.HiAnimeConfig.DownloadPath = config.HiAnimeConfig.DownloadPathSub;
-            config.HiAnimeConfig.PreferredLanguage = view.querySelector('#selHiAnimeLanguage').value;
-            config.HiAnimeConfig.OnlyEnglishDub = view.querySelector('#chkHiAnimeOnlyDub').checked;
 
             // s.to
             if (!config.StoConfig) config.StoConfig = {};

@@ -101,16 +101,6 @@ public class PluginConfiguration : BasePluginConfiguration
         PreferredProvider = "VOE",
     };
 
-    /// <summary>
-    /// Gets or sets the HiAnime (hianime.to) downloader configuration.
-    /// </summary>
-    // NOTE: HiAnime (hianime.to) has been shut down. Config is kept for potential future use.
-    public SiteDownloaderConfig HiAnimeConfig { get; set; } = new()
-    {
-        Enabled = false,
-        PreferredLanguage = "sub",
-    };
-
     // ── Legacy flat properties (backward compat / used as AniWorld defaults) ──
 
     /// <summary>
@@ -164,52 +154,8 @@ public class PluginConfiguration : BasePluginConfiguration
             return siteConfig.DownloadPath;
         }
 
-        // 3. HiAnime falls back to AniWorld's paths since both are anime
-        if (string.Equals(source, "hianime", System.StringComparison.OrdinalIgnoreCase))
-        {
-            if (!string.IsNullOrEmpty(language))
-            {
-                var awLangPath = AniWorldConfig.GetLanguagePath(language);
-                if (!string.IsNullOrEmpty(awLangPath))
-                {
-                    return awLangPath;
-                }
-            }
-
-            if (!string.IsNullOrEmpty(AniWorldConfig.DownloadPath))
-            {
-                return AniWorldConfig.DownloadPath;
-            }
-        }
-
-        // 4. Legacy global path
+        // 3. Legacy global path
         return DownloadPath;
-    }
-
-    /// <summary>
-    /// Returns all distinct non-empty download paths explicitly configured for a source.
-    /// No fallbacks — only returns paths set directly on this site's config.
-    /// </summary>
-    public List<string> GetAllDownloadPaths(string source)
-    {
-        var paths = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
-        var siteConfig = GetSiteConfig(source);
-
-        AddNonEmpty(paths, siteConfig.DownloadPath1);
-        AddNonEmpty(paths, siteConfig.DownloadPath2);
-        AddNonEmpty(paths, siteConfig.DownloadPath3);
-        AddNonEmpty(paths, siteConfig.DownloadPathSub);
-        AddNonEmpty(paths, siteConfig.DownloadPathDub);
-
-        return paths.ToList();
-    }
-
-    private static void AddNonEmpty(HashSet<string> set, string value)
-    {
-        if (!string.IsNullOrEmpty(value))
-        {
-            set.Add(value);
-        }
     }
 
     /// <summary>
@@ -247,7 +193,6 @@ public class PluginConfiguration : BasePluginConfiguration
         return source?.ToLowerInvariant() switch
         {
             "sto" => StoConfig,
-            "hianime" => HiAnimeConfig,
             _ => AniWorldConfig,
         };
     }
@@ -273,12 +218,6 @@ public class SiteDownloaderConfig
     /// <summary>Gets or sets the download path for language key "3" (German Sub for AniWorld).</summary>
     public string DownloadPath3 { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the download path for "sub" (English Sub for HiAnime).</summary>
-    public string DownloadPathSub { get; set; } = string.Empty;
-
-    /// <summary>Gets or sets the download path for "dub" (English Dub for HiAnime).</summary>
-    public string DownloadPathDub { get; set; } = string.Empty;
-
     /// <summary>Looks up a per-language download path by language key. Returns empty string if not set.</summary>
     [XmlIgnore]
     public Dictionary<string, string> DownloadPaths
@@ -289,8 +228,6 @@ public class SiteDownloaderConfig
             if (!string.IsNullOrEmpty(DownloadPath1)) dict["1"] = DownloadPath1;
             if (!string.IsNullOrEmpty(DownloadPath2)) dict["2"] = DownloadPath2;
             if (!string.IsNullOrEmpty(DownloadPath3)) dict["3"] = DownloadPath3;
-            if (!string.IsNullOrEmpty(DownloadPathSub)) dict["sub"] = DownloadPathSub;
-            if (!string.IsNullOrEmpty(DownloadPathDub)) dict["dub"] = DownloadPathDub;
             return dict;
         }
     }
@@ -303,8 +240,6 @@ public class SiteDownloaderConfig
             "1" => DownloadPath1,
             "2" => DownloadPath2,
             "3" => DownloadPath3,
-            "sub" => DownloadPathSub,
-            "dub" => DownloadPathDub,
             _ => string.Empty,
         };
     }
@@ -317,9 +252,6 @@ public class SiteDownloaderConfig
 
     /// <summary>Gets or sets the fallback provider. Empty = use global.</summary>
     public string FallbackProvider { get; set; } = string.Empty;
-
-    /// <summary>Gets or sets whether only English Dub downloads are allowed for HiAnime.</summary>
-    public bool OnlyEnglishDub { get; set; }
 
     /// <summary>Gets or sets whether only German languages (German Dub + German Sub) are allowed for AniWorld.</summary>
     public bool OnlyGermanLanguages { get; set; }
