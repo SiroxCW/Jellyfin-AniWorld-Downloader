@@ -166,6 +166,12 @@ Because the gate requires a real browser to solve an interactive Turnstile widge
 
 To check whether your server's IP is flagged, the repo includes [`scripts/check-sto-flag.sh`](scripts/check-sto-flag.sh): copy it to the server and run it.
 
+## Legal Disclaimer
+
+Jellyfin AniWorld Downloader is a **client-side** tool that enables access to content hosted on third-party websites. It **does not host, upload, store, or distribute any media itself**.
+
+This software is **not intended to promote piracy or copyright infringement**. You are solely responsible for how you use Jellyfin AniWorld Downloader and for ensuring that your use **complies with applicable laws** and the **terms of service of the websites you access**.
+
 ## License
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).
