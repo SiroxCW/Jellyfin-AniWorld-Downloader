@@ -509,6 +509,33 @@ public class DownloadService
             redirectUrl = fallbackResult.Value.url;
             task.Provider = fallbackResult.Value.provider;
             _logger.LogInformation("Falling back to provider {Provider} for {Url}", task.Provider, task.EpisodeUrl);
+
+            // If we fell back to a different language, relocate the output to that language's
+            // folder, update the recorded language, and surface a notice to the user.
+            var matchedLang = fallbackResult.Value.language;
+            if (!matchedLang.Equals(task.Language, StringComparison.OrdinalIgnoreCase))
+            {
+                var config = Plugin.Instance?.Configuration;
+                var isMovie = PathHelper.MovieFromUrl.IsMatch(task.EpisodeUrl);
+                var oldBase = config?.GetDownloadPath(task.Source, task.Language, isMovie) ?? string.Empty;
+                var newBase = config?.GetDownloadPath(task.Source, matchedLang, isMovie) ?? string.Empty;
+
+                if (!string.IsNullOrEmpty(newBase) && !string.IsNullOrEmpty(oldBase))
+                {
+                    var relative = Path.GetRelativePath(oldBase, task.OutputPath);
+                    task.OutputPath = Path.Combine(newBase, relative);
+                }
+
+                var oldLang = task.Language;
+                task.Language = matchedLang;
+                task.LanguageFallbackNote =
+                    $"Fell back to {LanguageDisplayName(matchedLang, task.Source)} " +
+                    $"({LanguageDisplayName(oldLang, task.Source)} unavailable)";
+                _logger.LogInformation(
+                    "Language fallback for {Url}: {Old} unavailable, downloading {New} instead",
+                    task.EpisodeUrl, oldLang, matchedLang);
+                _historyService.UpdateDownload(task);
+            }
         }
 
         // 3. Resolve redirect to provider embed URL
@@ -637,13 +664,13 @@ public class DownloadService
     /// <summary>
     /// Tries to find a fallback provider when the preferred one is unavailable.
     /// </summary>
-    private (string provider, string url)? TryFindFallbackProvider(
+    private (string provider, string url, string language)? TryFindFallbackProvider(
         EpisodeDetails details,
         string language,
         string excludeProvider)
     {
         // Helper: try find provider inside a single language block
-        (string provider, string url)? FindInLanguage(string lang)
+        (string provider, string url, string language)? FindInLanguage(string lang)
         {
             if (!details.ProvidersByLanguage.TryGetValue(lang, out var providers))
             {
@@ -663,7 +690,7 @@ public class DownloadService
                 if (providers.TryGetValue(prov, out var url) &&
                     extractorNames.Contains(prov))
                 {
-                    return (prov, url);
+                    return (prov, url, lang);
                 }
             }
 
@@ -672,7 +699,7 @@ public class DownloadService
                 if (!name.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase) &&
                     extractorNames.Contains(name))
                 {
-                    return (name, url);
+                    return (name, url, lang);
                 }
             }
 
@@ -776,6 +803,41 @@ public class DownloadService
             }
             return order;
         }
+    }
+
+    /// <summary>
+    /// Returns a human-readable language name for a language key, matching the labels shown in the UI.
+    /// </summary>
+    private static string LanguageDisplayName(string langKey, string source)
+    {
+        if (string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase))
+        {
+            return langKey switch
+            {
+                "sub" => "English Sub",
+                "dub" => "English Dub",
+                _ => langKey,
+            };
+        }
+
+        if (string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase))
+        {
+            return langKey switch
+            {
+                "1" => "German Dub",
+                "2" => "English Dub",
+                _ => langKey,
+            };
+        }
+
+        // aniworld (default)
+        return langKey switch
+        {
+            "1" => "German Dub",
+            "2" => "English Sub",
+            "3" => "German Sub",
+            _ => langKey,
+        };
     }
 
     /// <summary>
@@ -1067,6 +1129,9 @@ public class DownloadTask
 
     /// <summary>Gets or sets the language key.</summary>
     public string Language { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets a note shown to the user when the download fell back to another language.</summary>
+    public string? LanguageFallbackNote { get; set; }
 
     /// <summary>Gets or sets the output file path.</summary>
     public string OutputPath { get; set; } = string.Empty;

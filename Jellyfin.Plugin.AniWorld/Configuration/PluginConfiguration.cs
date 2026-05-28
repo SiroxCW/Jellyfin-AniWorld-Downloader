@@ -77,7 +77,7 @@ public class PluginConfiguration : BasePluginConfiguration
     ///   <item><description>German SUB > English SUB > German DUB</description></item>
     /// </list>
     /// </summary>
-    public string LanguageFallbackOrder { get; set; } = "2";
+    public string LanguageFallbackOrder { get; set; } = "1";
 
 
     // ── Per-site configs ─────────────────────────────────────────
