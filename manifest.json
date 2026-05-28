@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.6.1.0",
+        "changelog": "v1.6.1.0\n- Added language fallback. Thanks to Alexius25 on GitHub\n- Removed remaining dead HiAnime code\n- Removed: FlareSolverr integration. s.to has moved its provider redirector behind a Cloudflare Turnstile widget that activates per-IP for flagged egress addresses. FlareSolverr cannot solve embedded Turnstile widgets that require user interaction, so the integration was not actually helping affected users. If your server's IP is gated, route the plugin's outbound traffic through a clean proxy via the existing Proxy Server setting (SOCKS5 / HTTP supported).",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.6.1.0/jellyfin-aniworld-downloader-v1.6.1.0.zip",
+        "checksum": "3400a811bb3a00ef9ee84f9f1c8a9937",
+        "timestamp": "2026-05-28T21:08:33Z"
+      },
+      {
         "version": "1.6.0.0",
         "changelog": "v1.6.0.0\n- Feature: Automatic DDoS-Guard / Cloudflare challenge bypass via optional FlareSolverr integration - solved cookies are cached and reused so the round-trip is only paid on a fresh challenge\n- Feature: Movie download support for s.to and aniworld.to (#17, thanks @Alexius25)\n- Feature: Force option to re-download episodes already marked as downloaded\n- Feature: SOCKS5 / HTTP proxy support for outbound traffic to streaming sites\n- Feature: Manual \"Rebuild download history\" scheduled task to resync the database with files on disk\n- Fix: Movie detection and downloading reliability\n- Fix: Removed legacy scheduled task that was a no-op",
         "targetAbi": "10.11.0.0",
