@@ -88,6 +88,8 @@ After installing, go to **Dashboard > Plugins > AniWorld Downloader** to configu
 | Auto-scan Library | Trigger a Jellyfin library scan when a download finishes |
 | Enable for non-admin users | Allow non-admin users to access the downloader via the sidebar (see [Non-admin access](#non-admin-access)) |
 | Proxy Server | Route all network requests and downloads through a proxy (e.g. `http://proxy:8080` or `socks5://proxy:1080`). Leave empty to connect directly. Requires a server restart after changing. |
+| Movie download path | Default save location for movies (should point to a Jellyfin library folder) |
+| Language Fallback order | When the requested language is unavailable, fall back to other languages in the chosen priority order (default: No Fallback) |
 
 ### Per-site settings (aniworld.to / s.to)
 

@@ -63,6 +63,23 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string MovieDownloadPath { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets the fallback order for languages when the preferred language is not available.
+    /// <br /> <br />
+    /// Options:
+    /// <list type="number">
+    ///   <item><description>No Fallback</description></item>
+    ///   <item><description>German DUB > German SUB > English SUB (Recommended)</description></item>
+    ///   <item><description>German DUB > English SUB > German SUB</description></item>
+    ///   <item><description>English SUB > German DUB > German SUB</description></item>
+    ///   <item><description>English SUB > German SUB > German DUB</description></item>
+    ///   <item><description>German SUB > German DUB > English SUB</description></item>
+    ///   <item><description>German SUB > English SUB > German DUB</description></item>
+    /// </list>
+    /// </summary>
+    public string LanguageFallbackOrder { get; set; } = "1";
+
+
     // ── Per-site configs ─────────────────────────────────────────
 
     /// <summary>

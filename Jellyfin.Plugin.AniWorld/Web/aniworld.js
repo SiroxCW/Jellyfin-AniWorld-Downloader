@@ -1055,6 +1055,9 @@ export default function (view, params) {
                 if (dl.Status === 'Retrying' && dl.Error) {
                     html += '<div class="aw-dl-retry-info">\u23F3 ' + esc(dl.Error) + '</div>';
                 }
+                if (dl.LanguageFallbackNote) {
+                    html += '<div class="aw-dl-retry-info">' + esc(dl.LanguageFallbackNote) + '</div>';
+                }
                 html += '</div>';
 
                 html += '<div class="aw-dl-progress"><div class="aw-dl-bar" style="width:' + dl.Progress + '%"></div></div>';

@@ -509,6 +509,33 @@ public class DownloadService
             redirectUrl = fallbackResult.Value.url;
             task.Provider = fallbackResult.Value.provider;
             _logger.LogInformation("Falling back to provider {Provider} for {Url}", task.Provider, task.EpisodeUrl);
+
+            // If we fell back to a different language, relocate the output to that language's
+            // folder, update the recorded language, and surface a notice to the user.
+            var matchedLang = fallbackResult.Value.language;
+            if (!matchedLang.Equals(task.Language, StringComparison.OrdinalIgnoreCase))
+            {
+                var config = Plugin.Instance?.Configuration;
+                var isMovie = PathHelper.MovieFromUrl.IsMatch(task.EpisodeUrl);
+                var oldBase = config?.GetDownloadPath(task.Source, task.Language, isMovie) ?? string.Empty;
+                var newBase = config?.GetDownloadPath(task.Source, matchedLang, isMovie) ?? string.Empty;
+
+                if (!string.IsNullOrEmpty(newBase) && !string.IsNullOrEmpty(oldBase))
+                {
+                    var relative = Path.GetRelativePath(oldBase, task.OutputPath);
+                    task.OutputPath = Path.Combine(newBase, relative);
+                }
+
+                var oldLang = task.Language;
+                task.Language = matchedLang;
+                task.LanguageFallbackNote =
+                    $"Fell back to {LanguageDisplayName(matchedLang, task.Source)} " +
+                    $"({LanguageDisplayName(oldLang, task.Source)} unavailable)";
+                _logger.LogInformation(
+                    "Language fallback for {Url}: {Old} unavailable, downloading {New} instead",
+                    task.EpisodeUrl, oldLang, matchedLang);
+                _historyService.UpdateDownload(task);
+            }
         }
 
         // 3. Resolve redirect to provider embed URL
@@ -637,43 +664,180 @@ public class DownloadService
     /// <summary>
     /// Tries to find a fallback provider when the preferred one is unavailable.
     /// </summary>
-    private (string provider, string url)? TryFindFallbackProvider(
+    private (string provider, string url, string language)? TryFindFallbackProvider(
         EpisodeDetails details,
         string language,
         string excludeProvider)
     {
-        if (!details.ProvidersByLanguage.TryGetValue(language, out var providers))
+        // Helper: try find provider inside a single language block
+        (string provider, string url, string language)? FindInLanguage(string lang)
         {
+            if (!details.ProvidersByLanguage.TryGetValue(lang, out var providers))
+            {
+                return null;
+            }
+
+            var providerPriority = new[] { "VOE", "Filemoon", "Vidmoly", "Vidoza" };
+            var extractorNames = _extractors.Select(e => e.ProviderName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var prov in providerPriority)
+            {
+                if (prov.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (providers.TryGetValue(prov, out var url) &&
+                    extractorNames.Contains(prov))
+                {
+                    return (prov, url, lang);
+                }
+            }
+
+            foreach (var (name, url) in providers)
+            {
+                if (!name.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase) &&
+                    extractorNames.Contains(name))
+                {
+                    return (name, url, lang);
+                }
+            }
+
             return null;
         }
 
-        var providerPriority = new[] { "VOE", "Filemoon", "Vidmoly", "Vidoza" };
-        var extractorNames = _extractors.Select(e => e.ProviderName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var prov in providerPriority)
+        // 1) Try in the requested language first
+        var found = FindInLanguage(language);
+        if (found != null)
         {
-            if (prov.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase))
+            return found;
+        }
+
+        // 2) Build fallback language order from configuration
+        var configValue = Plugin.Instance?.Configuration?.LanguageFallbackOrder ?? "1";
+        var fallbackOrder = GetFallbackLanguageOrder(language, configValue);
+
+        // If config indicates "No fallback" (e.g. option "1"), this will be empty.
+        foreach (var lang in fallbackOrder)
+        {
+            if (lang.Equals(language, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            if (providers.TryGetValue(prov, out var url) &&
-                extractorNames.Contains(prov))
+            found = FindInLanguage(lang);
+            if (found != null)
             {
-                return (prov, url);
-            }
-        }
-
-        foreach (var (name, url) in providers)
-        {
-            if (!name.Equals(excludeProvider, StringComparison.OrdinalIgnoreCase) &&
-                extractorNames.Contains(name))
-            {
-                return (name, url);
+                return found;
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Returns language keys in the configured fallback order suitable for the requested language key.
+    /// </summary>
+    private IEnumerable<string> GetFallbackLanguageOrder(string currentLanguage, string configOption)
+    {
+        // Map numeric options (see PluginConfiguration.LanguageFallbackOrder) to language-key orders.
+        // Options (as in config docs):
+        // "1" = No fallback
+        // "2" = German DUB > German SUB > English SUB (recommended)
+        // "3" = German DUB > English SUB > German SUB
+        // "4" = English SUB > German DUB > German SUB
+        // "5" = English SUB > German SUB > German DUB
+        // "6" = German SUB > German DUB > English SUB
+        // "7" = German SUB > English SUB > German DUB
+        // We support both AniWorld/s.to keys ("1","2","3") and HiAnime keys ("sub","dub").
+
+        // Normalize config option
+        if (!int.TryParse(configOption, out var opt))
+        {
+            opt = 1;
+        }
+
+        // Helper to return order for anime-style keys ("1"=GerDub, "2"=EngSub, "3"=GerSub)
+        string[] MapAnimeOrder(int option) => option switch
+        {
+            2 => [ "1", "3", "2" ],
+            3 => [ "1", "2", "3" ],
+            4 => [ "2", "1", "3" ],
+            5 => [ "2", "3", "1" ],
+            6 => [ "3", "1", "2" ],
+            7 => [ "3", "2", "1" ],
+            _ => Array.Empty<string>(), // "1" or unknown => no fallback
+        };
+
+        // Helper to return order for hianime-style keys ("dub","sub")
+        string[] MapHiAnimeOrder(int option) => option switch
+        {
+            2 => [ "dub", "sub" ], // treat recommended mapping as dub->sub
+            3 => [ "dub", "sub" ],
+            4 => [ "sub", "dub" ],
+            5 => [ "sub", "dub" ],
+            6 => [ "sub", "dub" ],
+            7 => [ "sub", "dub" ],
+            _ => Array.Empty<string>(),
+        };
+
+        // Decide mapping based on the namespace of the currentLanguage
+        if (string.Equals(currentLanguage, "sub", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(currentLanguage, "dub", StringComparison.OrdinalIgnoreCase))
+        {
+            var order = MapHiAnimeOrder(opt);
+            // Ensure current language included first if config produced an order
+            if (order.Length > 0 && !order.Contains(currentLanguage, StringComparer.OrdinalIgnoreCase))
+            {
+                order = (new[] { currentLanguage }).Concat(order).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            return order;
+        }
+        else
+        {
+            var order = MapAnimeOrder(opt);
+            if (order.Length > 0 && !order.Contains(currentLanguage, StringComparer.OrdinalIgnoreCase))
+            {
+                // Put requested language first so loops skip it quickly
+                order = (new[] { currentLanguage }).Concat(order).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            return order;
+        }
+    }
+
+    /// <summary>
+    /// Returns a human-readable language name for a language key, matching the labels shown in the UI.
+    /// </summary>
+    private static string LanguageDisplayName(string langKey, string source)
+    {
+        if (string.Equals(source, "hianime", StringComparison.OrdinalIgnoreCase))
+        {
+            return langKey switch
+            {
+                "sub" => "English Sub",
+                "dub" => "English Dub",
+                _ => langKey,
+            };
+        }
+
+        if (string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase))
+        {
+            return langKey switch
+            {
+                "1" => "German Dub",
+                "2" => "English Dub",
+                _ => langKey,
+            };
+        }
+
+        // aniworld (default)
+        return langKey switch
+        {
+            "1" => "German Dub",
+            "2" => "English Sub",
+            "3" => "German Sub",
+            _ => langKey,
+        };
     }
 
     /// <summary>
@@ -965,6 +1129,9 @@ public class DownloadTask
 
     /// <summary>Gets or sets the language key.</summary>
     public string Language { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets a note shown to the user when the download fell back to another language.</summary>
+    public string? LanguageFallbackNote { get; set; }
 
     /// <summary>Gets or sets the output file path.</summary>
     public string OutputPath { get; set; } = string.Empty;

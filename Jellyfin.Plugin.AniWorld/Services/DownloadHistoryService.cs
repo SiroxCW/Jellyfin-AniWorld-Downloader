@@ -164,6 +164,7 @@ public class DownloadHistoryService : IDisposable
                     UPDATE download_history SET
                         episode_title = @epTitle,
                         provider = @provider,
+                        language = @language,
                         output_path = @path,
                         status = @status,
                         progress = @progress,
@@ -177,6 +178,7 @@ public class DownloadHistoryService : IDisposable
                 cmd.Parameters.AddWithValue("@id", task.Id);
                 cmd.Parameters.AddWithValue("@epTitle", task.EpisodeTitle ?? string.Empty);
                 cmd.Parameters.AddWithValue("@provider", task.Provider);
+                cmd.Parameters.AddWithValue("@language", task.Language);
                 cmd.Parameters.AddWithValue("@path", task.OutputPath);
                 cmd.Parameters.AddWithValue("@status", task.Status.ToString());
                 cmd.Parameters.AddWithValue("@progress", task.Progress);

@@ -94,6 +94,22 @@
                         </div>
                     </div>
 
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="txtLanguageFallbackOrder">Language Fallback Order</label>
+                        <select is="emby-select" id="txtLanguageFallbackOrder">
+                            <option value="1" selected>No Fallback</option>
+                            <option value="2">German DUB > German SUB > English SUB (Recommended)</option>
+                            <option value="3">German DUB > English SUB > German SUB</option>
+                            <option value="4">English SUB > German DUB > German SUB</option>
+                            <option value="5">English SUB > German SUB > German DUB</option>
+                            <option value="6">German SUB > German DUB > English SUB</option>
+                            <option value="7">German SUB > English SUB > German DUB</option>
+                        </select>
+                        <div class="fieldDescription">
+                            The language the user requested is tried first. If it fails, it tries the selected priority, skipping the one which failed.
+                        </div>
+                    </div>
+
                     <!-- AniWorld Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">AniWorld Downloader (aniworld.to)</h3>
