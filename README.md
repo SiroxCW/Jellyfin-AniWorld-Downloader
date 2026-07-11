@@ -166,6 +166,11 @@ Because the gate requires a real browser to solve an interactive Turnstile widge
 
 To check whether your server's IP is flagged, the repo includes [`scripts/check-sto-flag.sh`](scripts/check-sto-flag.sh): copy it to the server and run it.
 
+## Other Cool Projects
+
+- **[Media Forge](https://github.com/PD-Codes/MediaForge)** by **[TheMRX](https://github.com/TheMRX13) and [Domekologe](https://github.com/Domekologe)** — a cross-platform WebUI tool for downloading anime from aniworld.to, series from s.to, and movies from filmpalast.to. It runs on Windows, macOS, and Linux.
+- **[AniBridge](https://github.com/Zzackllack/AniBridge)** by **[Zzackllack](https://github.com/Zzackllack)** — a minimal FastAPI service bridging anime and series catalogues (AniWorld, SerienStream/s.to, MegaKino) with automation tools.
+
 ## Legal Disclaimer
 
 Jellyfin AniWorld Downloader is a **client-side** tool that enables access to content hosted on third-party websites. It **does not host, upload, store, or distribute any media itself**.
