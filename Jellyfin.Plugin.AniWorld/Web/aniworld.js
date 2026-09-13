@@ -278,7 +278,7 @@ export default function (view, params) {
                 html += '<div class="aw-browse-cover aw-cover-placeholder" id="' + cardId + '-cover"></div>';
                 var badgeCls = 'aw-browse-source-badge' + (source === 'aniworld' ? ' aw-badge-aniworld' : '');
                 html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" />';
-                html += '<div class="aw-browse-info">';
+                html += '<div class="aw-browse-info aw-browse-info-solo">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
                 html += '</div></div>';
             });
@@ -379,17 +379,14 @@ export default function (view, params) {
 
             if (series.Seasons && series.Seasons.length > 0) {
                 html += '<div class="aw-series-actions">';
-                html += '<div class="aw-seasons">';
-                series.Seasons.forEach(function (season, idx) {
-                    var cls = idx === 0 ? ' active' : '';
-                    var seasonLabel = 'Season ' + season.Number;
-                    html += '<button class="aw-season' + cls + '" data-url="' + esc(season.Url) + '" onclick="window.AW.loadSeason(\'' + encodeURIComponent(season.Url) + '\', this)">' + seasonLabel + '</button>';
+                html += '<select id="aw-season-select" class="aw-season-select" title="Select season" onchange="window.AW.loadSeason(this.value)">';
+                series.Seasons.forEach(function (season) {
+                    html += '<option value="' + encodeURIComponent(season.Url) + '">Season ' + esc(String(season.Number)) + '</option>';
                 });
                 if (series.HasMovies) {
-                    var movieUrl = seriesUrl + '/filme';
-                    html += '<button class="aw-season" data-url="' + esc(movieUrl) + '" onclick="window.AW.loadSeason(\'' + encodeURIComponent(movieUrl) + '\', this)">\uD83C\uDFAC Movies</button>';
+                    html += '<option value="' + encodeURIComponent(seriesUrl + '/filme') + '">\uD83C\uDFAC Movies</option>';
                 }
-                html += '</div>';
+                html += '</select>';
                 html += '</div>';
             }
 
@@ -403,11 +400,10 @@ export default function (view, params) {
         },
 
         // ── Season Episodes ──
-        loadSeason: function (encodedUrl, btn) {
-            if (btn) {
-                view.querySelectorAll('.aw-season').forEach(function (b) { b.classList.remove('active'); });
-                btn.classList.add('active');
-            }
+        loadSeason: function (encodedUrl) {
+            // Keep the picker in sync when loadSeason is called programmatically.
+            var picker = view.querySelector('#aw-season-select');
+            if (picker && picker.value !== encodedUrl) picker.value = encodedUrl;
 
             this.seasonGeneration++;
             var myGeneration = this.seasonGeneration;
@@ -448,16 +444,22 @@ export default function (view, params) {
 
             if (barContainer) {
                 var bar = '<div class="aw-season-actions">';
+                bar += '<div class="aw-season-meta">';
                 bar += '<span class="aw-ep-count">' + episodes.length + ' episode' + (episodes.length === 1 ? '' : 's') + '</span>';
                 bar += '<select id="aw-season-lang" class="aw-lang-select" title="Language for downloads">';
                 bar += getLangOptionsHtml(source);
                 bar += '</select>';
-                bar += '<label style="display:inline-flex;align-items:center;gap:0.3em;font-size:0.82em;cursor:pointer;opacity:0.85" title="Priority downloads are added to the front of the queue"><input type="checkbox" id="aw-priority-cb" style="cursor:pointer"> Priority</label>';
-                bar += '<label style="display:inline-flex;align-items:center;gap:0.3em;font-size:0.82em;cursor:pointer;opacity:0.85" title="Redownload episodes even if they are already flagged as downloaded"><input type="checkbox" id="aw-force-cb" style="cursor:pointer"> Force</label>';
+                bar += '</div>';
+                bar += '<div class="aw-season-opts">';
+                bar += '<label class="aw-check" title="Priority downloads are added to the front of the queue"><input type="checkbox" id="aw-priority-cb"><span>Priority</span></label>';
+                bar += '<label class="aw-check" title="Redownload episodes even if they are already flagged as downloaded"><input type="checkbox" id="aw-force-cb"><span>Force</span></label>';
+                bar += '</div>';
+                bar += '<div class="aw-season-btns">';
                 bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')">\u2B07\uFE0F Download Season</button>';
                 if (AW.currentSeriesUrl) {
                     bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')">\u2B07\uFE0F Download All Seasons</button>';
                 }
+                bar += '</div>';
                 bar += '</div>';
 
                 barContainer.innerHTML = bar;
@@ -979,7 +981,7 @@ export default function (view, params) {
             html += '<option value="Failed">\u274C Failed</option>';
             html += '<option value="Cancelled">\u26D4 Cancelled</option>';
             html += '</select>';
-            html += '<input type="text" id="aw-hist-series" placeholder="Filter by series..." style="padding:0.4em 0.7em;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:inherit;font-size:0.85em;min-width:200px;" />';
+            html += '<input type="text" id="aw-hist-series" class="aw-hist-input" placeholder="Filter by series..." />';
             html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.filterHistory()">Filter</button>';
             html += '</div>';
             container.innerHTML = html;

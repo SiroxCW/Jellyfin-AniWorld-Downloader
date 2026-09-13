@@ -73,20 +73,20 @@
         // Create full-screen modal
         var overlay = document.createElement('div');
         overlay.id = MODAL_ID;
-        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;display:flex;flex-direction:column;background:#181818;';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;display:flex;flex-direction:column;background:#181818;overscroll-behavior:contain;';
 
         // Header
         var header = document.createElement('div');
-        header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:0.5em 1em;background:#101010;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
+        header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0.5em;padding:0.5em 0.8em;padding-top:calc(0.5em + env(safe-area-inset-top));padding-left:calc(0.8em + env(safe-area-inset-left));padding-right:calc(0.8em + env(safe-area-inset-right));background:#101010;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
 
         var title = document.createElement('span');
         title.textContent = 'AniWorld Downloader';
-        title.style.cssText = 'font-size:1.1em;font-weight:600;color:#fff;';
+        title.style.cssText = 'font-size:1.1em;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;';
 
         var closeBtn = document.createElement('button');
         closeBtn.innerHTML = '<span class="material-icons" style="font-size:1.5em;">close</span>';
         closeBtn.title = 'Close';
-        closeBtn.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;padding:0.3em;border-radius:50%;display:flex;align-items:center;opacity:0.7;';
+        closeBtn.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;padding:0.5em;min-width:44px;min-height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0.7;flex-shrink:0;-webkit-tap-highlight-color:transparent;';
         closeBtn.addEventListener('mouseenter', function () { this.style.opacity = '1'; });
         closeBtn.addEventListener('mouseleave', function () { this.style.opacity = '0.7'; });
         closeBtn.addEventListener('click', hideModal);
@@ -97,7 +97,7 @@
         // Scrollable content
         var content = document.createElement('div');
         content.id = 'aw-modal-content';
-        content.style.cssText = 'flex:1;overflow-y:auto;background:#181818;color:#eee;';
+        content.style.cssText = 'flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:#181818;color:#eee;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);';
 
         // Loading spinner
         content.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:3em;opacity:0.6;">' +

@@ -7,21 +7,29 @@
     <div id="AniWorldPage" data-role="page" class="page type-interior" data-controller="__plugin/AniWorldDownloaderJS">
         <style>
         .aw { max-width: 1200px; margin: 0 auto; padding: 1em; font-family: inherit; }
+        .aw, .aw *, .aw *::before, .aw *::after { box-sizing: border-box; }
+
+        /* Page header */
+        .aw-header { display: flex; align-items: center; justify-content: space-between; gap: 0.6em; flex-wrap: wrap; }
+        .aw-header .sectionTitle { margin: 0; }
+        .aw-header-actions { display: flex; gap: 0.5em; align-items: center; flex-shrink: 0; }
+        .aw-header-actions .aw-btn { text-decoration: none; }
 
         /* Tabs */
         .aw-tabs { display: flex; gap: 0; border-bottom: 2px solid rgba(255,255,255,0.1); margin-bottom: 1.5em; }
-        .aw-tab { padding: 0.7em 1.5em; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 0.95em; opacity: 0.7; transition: all 0.2s; }
+        .aw-tab { padding: 0.7em 1.5em; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 0.95em; opacity: 0.7; transition: all 0.2s; white-space: nowrap; }
         .aw-tab:hover { opacity: 1; }
         .aw-tab.active { border-bottom-color: #00a4dc; color: #00a4dc; opacity: 1; }
         .aw-tab .aw-badge { background: #00a4dc; color: #fff; border-radius: 10px; padding: 0.1em 0.5em; font-size: 0.75em; margin-left: 0.4em; }
 
         /* Search */
         .aw-search { display: flex; gap: 0.5em; margin-bottom: 1.5em; }
-        .aw-search input { flex: 1; padding: 0.6em 1em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: inherit; font-size: 1em; outline: none; }
+        .aw-search input { flex: 1 1 auto; min-width: 0; padding: 0.6em 1em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: inherit; font-size: 1em; outline: none; }
         .aw-search input:focus { border-color: #00a4dc; }
+        .aw-search .aw-btn { flex: 0 0 auto; }
 
         /* Buttons */
-        .aw-btn { padding: 0.5em 1em; border-radius: 6px; border: none; cursor: pointer; font-size: 0.85em; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.4em; }
+        .aw-btn { padding: 0.5em 1em; border-radius: 6px; border: none; cursor: pointer; font-size: 0.85em; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.4em; line-height: 1.2; }
         .aw-btn-primary { background: #00a4dc; color: white; }
         .aw-btn-primary:hover { background: #0090c4; }
         .aw-btn-success { background: #4caf50; color: white; }
@@ -37,13 +45,18 @@
         .aw-btn-sm { padding: 0.3em 0.7em; font-size: 0.8em; }
         .aw-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+        /* Checkbox option (Priority / Force) */
+        .aw-check { display: inline-flex; align-items: center; gap: 0.4em; font-size: 0.82em; cursor: pointer; opacity: 0.85; white-space: nowrap; -webkit-user-select: none; user-select: none; }
+        .aw-check input { cursor: pointer; margin: 0; flex-shrink: 0; accent-color: #00a4dc; }
+
         /* Source logo (inline in titles) */
         .aw-source-logo { height: 1.2em; vertical-align: middle; }
 
         /* Series detail */
         .aw-series { display: flex; gap: 2em; margin-bottom: 1.5em; }
-        .aw-cover { width: 220px; border-radius: 10px; flex-shrink: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
-        .aw-meta h2 { margin: 0 0 0.5em; font-size: 1.5em; display: flex; align-items: center; gap: 0.4em; }
+        .aw-cover { width: 220px; max-width: 100%; border-radius: 10px; flex-shrink: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        .aw-meta { min-width: 0; }
+        .aw-meta h2 { margin: 0 0 0.5em; font-size: 1.5em; display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap; overflow-wrap: anywhere; }
         .aw-meta p { opacity: 0.7; line-height: 1.6; margin: 0.5em 0; }
         .aw-genres { display: flex; gap: 0.4em; flex-wrap: wrap; margin: 0.8em 0; }
         .aw-genre { background: rgba(0,164,220,0.2); border: 1px solid rgba(0,164,220,0.3); padding: 0.2em 0.6em; border-radius: 12px; font-size: 0.78em; }
@@ -51,30 +64,34 @@
         /* Series actions (seasons) */
         .aw-series-actions { display: flex; align-items: flex-start; gap: 1em; margin-bottom: 1.2em; }
 
-        /* Season pills */
-        .aw-seasons { display: flex; gap: 0.4em; flex-wrap: wrap; flex: 1; }
-        .aw-season { padding: 0.45em 1.1em; border-radius: 20px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: inherit; cursor: pointer; font-size: 0.85em; transition: all 0.2s; }
-        .aw-season:hover { background: rgba(0,164,220,0.15); border-color: rgba(0,164,220,0.3); }
-        .aw-season.active { background: rgba(0,164,220,0.3); border-color: #00a4dc; color: #fff; }
+        /* Season picker */
+        .aw-season-select { padding: 0.5em 0.9em; border-radius: 8px; background: rgba(0,164,220,0.15); border: 1px solid rgba(0,164,220,0.35); color: inherit; font-size: 0.9em; cursor: pointer; min-width: 12em; max-width: 100%; }
+        .aw-season-select:hover { border-color: rgba(0,164,220,0.6); }
+        .aw-season-select:focus { border-color: #00a4dc; outline: none; }
 
         /* Season actions bar */
-        .aw-season-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8em; padding: 0.5em 0; gap: 0.6em; }
-        .aw-season-actions .aw-ep-count { opacity: 0.5; font-size: 0.85em; flex: 1; }
-        .aw-lang-select { padding: 0.3em 0.7em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: inherit; font-size: 0.82em; cursor: pointer; }
+        .aw-season-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6em 0.9em; margin-bottom: 0.8em; padding: 0.5em 0; }
+        .aw-season-meta { display: flex; align-items: center; gap: 0.6em; flex: 1 1 auto; min-width: 0; }
+        .aw-season-opts { display: flex; align-items: center; gap: 0.9em; flex: 0 0 auto; flex-wrap: wrap; }
+        .aw-season-btns { display: flex; gap: 0.4em; flex: 0 0 auto; flex-wrap: wrap; }
+        .aw-season-actions .aw-ep-count { opacity: 0.5; font-size: 0.85em; white-space: nowrap; }
+        .aw-lang-select { padding: 0.3em 0.7em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: inherit; font-size: 0.82em; cursor: pointer; max-width: 100%; }
         .aw-lang-select:focus { border-color: #00a4dc; outline: none; }
 
         /* Episode list */
         .aw-episodes { display: flex; flex-direction: column; gap: 0.4em; }
         .aw-ep { display: flex; align-items: center; gap: 0.5em; padding: 0.8em 1em; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; transition: all 0.15s; }
         .aw-ep:hover { background: rgba(255,255,255,0.06); }
-        .aw-ep-num { font-weight: 600; min-width: 3em; opacity: 0.5; font-size: 0.9em; }
-        .aw-ep-title { flex: 1; font-size: 0.9em; }
-        .aw-ep-actions { display: flex; gap: 0.4em; }
-        .aw-ep-providers { padding: 0.8em 1em; margin-top: -1px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 0 0 8px 8px; }
-        .aw-ep-providers .aw-lang-group { margin-bottom: 0.5em; }
-        .aw-ep-providers .aw-lang-label { font-weight: 600; font-size: 0.8em; opacity: 0.6; margin-bottom: 0.3em; }
-        .aw-ep-providers .aw-provider-btns { display: flex; gap: 0.3em; flex-wrap: wrap; }
-        .aw-ep-downloaded { display: inline-flex; align-items: center; gap: 0.3em; opacity: 0.7; color: #4caf50; vertical-align: middle; }
+        .aw-ep-num { font-weight: 600; min-width: 3em; opacity: 0.5; font-size: 0.9em; flex-shrink: 0; }
+        .aw-ep-title { flex: 1; min-width: 0; font-size: 0.9em; overflow-wrap: anywhere; }
+        .aw-ep-actions { display: flex; gap: 0.4em; flex-shrink: 0; }
+        .aw-ep-providers { padding: 0.8em 1em; margin-top: calc(-0.4em - 1px); background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 0 0 8px 8px; }
+        .aw-ep-providers .aw-lang-group { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4em 0.8em; margin-bottom: 0.5em; }
+        .aw-ep-providers .aw-lang-group:last-child { margin-bottom: 0; }
+        .aw-ep-providers .aw-lang-label { font-weight: 600; font-size: 0.8em; opacity: 0.6; flex: 0 0 auto; }
+        /* margin-left:auto keeps the buttons hard right, on the label's row or wrapped below it */
+        .aw-ep-providers .aw-provider-btns { display: flex; gap: 0.3em; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+        .aw-ep-downloaded { display: inline-flex; align-items: center; gap: 0.3em; opacity: 0.7; color: #4caf50; vertical-align: middle; flex-shrink: 0; }
         .aw-ep-downloaded img { height: 1.1em; vertical-align: middle; }
 
         /* Downloads */
@@ -82,11 +99,11 @@
         .aw-dl-item { display: flex; align-items: center; gap: 1em; padding: 1em; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; }
         .aw-dl-info { flex: 1; min-width: 0; }
         .aw-dl-info strong { display: flex; align-items: center; gap: 0.3em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .aw-dl-info small { opacity: 0.5; }
+        .aw-dl-info small { opacity: 0.5; overflow-wrap: anywhere; }
         .aw-dl-progress { width: 120px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
         .aw-dl-bar { height: 100%; background: #00a4dc; transition: width 0.4s ease; border-radius: 3px; }
-        .aw-dl-pct { min-width: 3em; text-align: right; font-size: 0.85em; opacity: 0.7; }
-        .aw-status { padding: 0.2em 0.6em; border-radius: 4px; font-size: 0.75em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .aw-dl-pct { min-width: 3em; text-align: right; font-size: 0.85em; opacity: 0.7; flex-shrink: 0; }
+        .aw-status { padding: 0.2em 0.6em; border-radius: 4px; font-size: 0.75em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
         .aw-status-downloading { background: rgba(0,164,220,0.25); color: #4dc9f6; }
         .aw-status-completed { background: rgba(76,175,80,0.25); color: #81c784; }
         .aw-status-failed { background: rgba(244,67,54,0.25); color: #ef5350; }
@@ -95,16 +112,17 @@
         .aw-status-retrying { background: rgba(255,152,0,0.25); color: #ffb74d; animation: aw-pulse 1.5s infinite; }
         .aw-status-cancelled { background: rgba(158,158,158,0.25); color: #bdbdbd; }
         @keyframes aw-pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-        .aw-dl-error { color: #ef5350; font-size: 0.8em; margin-top: 0.3em; }
-        .aw-dl-retry-info { color: #ffb74d; font-size: 0.78em; margin-top: 0.2em; }
-        .aw-dl-size { opacity: 0.5; font-size: 0.78em; margin-left: 0.5em; }
+        .aw-dl-error { color: #ef5350; font-size: 0.8em; margin-top: 0.3em; overflow-wrap: anywhere; }
+        .aw-dl-retry-info { color: #ffb74d; font-size: 0.78em; margin-top: 0.2em; overflow-wrap: anywhere; }
+        .aw-dl-size { opacity: 0.5; font-size: 0.78em; margin-left: 0.5em; white-space: nowrap; }
         .aw-dl-actions { display: flex; gap: 0.3em; margin-top: 1em; margin-bottom: 0.8em; }
         .aw-dl-btns { display: flex; gap: 0.3em; flex-shrink: 0; }
+        .aw-dl-btns:empty { display: none; }
 
         /* Stats cards */
         .aw-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1em; margin-bottom: 1.5em; }
-        .aw-stat { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1em 1.2em; text-align: center; }
-        .aw-stat-value { font-size: 1.8em; font-weight: 700; color: #00a4dc; }
+        .aw-stat { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1em 1.2em; text-align: center; min-width: 0; }
+        .aw-stat-value { font-size: 1.8em; font-weight: 700; color: #00a4dc; overflow-wrap: anywhere; }
         .aw-stat-label { font-size: 0.78em; opacity: 0.5; margin-top: 0.3em; }
         .aw-stat-value.green { color: #4caf50; }
         .aw-stat-value.red { color: #ef5350; }
@@ -115,17 +133,19 @@
         .aw-hist-item { display: flex; align-items: center; gap: 1em; padding: 0.8em 1em; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; }
         .aw-hist-info { flex: 1; min-width: 0; }
         .aw-hist-info strong { display: flex; align-items: center; gap: 0.3em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.95em; }
-        .aw-hist-info small { opacity: 0.5; font-size: 0.8em; }
+        .aw-hist-info small { opacity: 0.5; font-size: 0.8em; overflow-wrap: anywhere; }
         .aw-hist-meta { display: flex; gap: 0.8em; align-items: center; flex-shrink: 0; }
-        .aw-hist-meta .aw-hist-size { opacity: 0.5; font-size: 0.82em; min-width: 5em; text-align: right; }
-        .aw-hist-meta .aw-hist-date { opacity: 0.4; font-size: 0.78em; min-width: 8em; text-align: right; }
+        .aw-hist-meta .aw-hist-size { opacity: 0.5; font-size: 0.82em; min-width: 5em; text-align: right; white-space: nowrap; }
+        .aw-hist-meta .aw-hist-date { opacity: 0.4; font-size: 0.78em; min-width: 8em; text-align: right; white-space: nowrap; }
         .aw-hist-filters { display: flex; gap: 0.5em; margin-bottom: 1em; flex-wrap: wrap; align-items: center; }
-        .aw-hist-filters select { padding: 0.4em 0.7em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: inherit; font-size: 0.85em; }
+        .aw-hist-filters select, .aw-hist-input { padding: 0.4em 0.7em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: inherit; font-size: 0.85em; max-width: 100%; }
+        .aw-hist-input { min-width: 200px; }
+        .aw-hist-input:focus, .aw-hist-filters select:focus { border-color: #00a4dc; outline: none; }
         .aw-hist-more { text-align: center; padding: 1em; }
 
         /* Browse tabs */
-        .aw-browse-tabs { display: flex; gap: 0.5em; margin-bottom: 1.5em; }
-        .aw-browse-pill { padding: 0.5em 1.2em; border-radius: 20px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: inherit; cursor: pointer; font-size: 0.9em; transition: all 0.2s; }
+        .aw-browse-tabs { display: flex; gap: 0.5em; margin-bottom: 1.5em; flex-wrap: wrap; }
+        .aw-browse-pill { padding: 0.5em 1.2em; border-radius: 20px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: inherit; cursor: pointer; font-size: 0.9em; transition: all 0.2s; white-space: nowrap; }
         .aw-browse-pill:hover { background: rgba(0,164,220,0.15); border-color: rgba(0,164,220,0.3); }
         .aw-browse-pill.active { background: rgba(0,164,220,0.3); border-color: #00a4dc; color: #fff; }
 
@@ -136,9 +156,12 @@
         .aw-browse-cover { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; background: rgba(255,255,255,0.03); }
         .aw-cover-placeholder { background: linear-gradient(110deg, rgba(255,255,255,0.03) 30%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 70%); background-size: 200% 100%; animation: aw-shimmer 1.5s ease-in-out infinite; }
         @keyframes aw-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        .aw-browse-info { padding: 0.6em 0.8em; }
-        .aw-browse-info h3 { margin: 0; font-size: 0.85em; color: #fff; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .aw-browse-info small { display: block; margin-top: 0.3em; opacity: 0.5; font-size: 0.75em; }
+        .aw-browse-info { padding: 0.7em 0.8em; }
+        .aw-browse-info h3 { margin: 0; font-size: 1em; font-weight: 600; color: #fff; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+        .aw-browse-info small { display: block; margin-top: 0.35em; opacity: 0.5; font-size: 0.8em; }
+        /* Search results carry no genre line, so the title block would sit squat.
+           The extra padding makes it match the height of a Browse card's title + genre. */
+        .aw-browse-info-solo { padding-block: 1.35em; }
         .aw-browse-source-badge { position: absolute; top: 0.4em; right: 0.4em; height: 1.4em; border-radius: 4px; padding: 0.15em 0.3em; }
         .aw-browse-source-badge.aw-badge-aniworld { background: rgba(0,0,0,0.5); border-radius: 999px; }
 
@@ -146,35 +169,152 @@
         .aw-browse-section-title { font-size: 1.1em; font-weight: 600; margin: 1.2em 0 0.8em; }
 
         /* Utility */
-        .aw-empty { text-align: center; padding: 3em; opacity: 0.4; }
+        .aw-empty { text-align: center; padding: 3em 1em; opacity: 0.4; }
         .aw-empty-icon { font-size: 2.5em; margin-bottom: 0.3em; }
         .aw-back { margin-bottom: 1.2em; }
         .aw-warning { background: rgba(255, 165, 0, 0.15); border: 1px solid rgba(255, 165, 0, 0.4); border-radius: 8px; padding: 0.8em 1em; margin-bottom: 1.2em; display: flex; align-items: center; gap: 0.6em; font-size: 0.9em; color: #ffcc80; }
-        .aw-spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid rgba(255,255,255,0.2); border-top-color: #00a4dc; border-radius: 50%; animation: aw-spin 0.8s linear infinite; }
+        .aw-spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid rgba(255,255,255,0.2); border-top-color: #00a4dc; border-radius: 50%; animation: aw-spin 0.8s linear infinite; flex-shrink: 0; }
         @keyframes aw-spin { to { transform: rotate(360deg); } }
-        .aw-loading { display: flex; align-items: center; justify-content: center; gap: 0.8em; padding: 2em; opacity: 0.6; }
+        .aw-loading { display: flex; align-items: center; justify-content: center; gap: 0.8em; padding: 2em 1em; opacity: 0.6; text-align: center; }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .aw-series { flex-direction: column; align-items: center; text-align: center; }
-            .aw-cover { width: 160px; }
+        /* ── Tablet ── */
+        @media (max-width: 900px) {
+            .aw { padding: 0.9em 0.8em; }
+            .aw-series { gap: 1.4em; }
+            .aw-cover { width: 180px; }
+            .aw-browse-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.8em; }
+            .aw-stats { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.7em; }
+        }
+
+        /* ── Phone ── */
+        @media (max-width: 640px) {
+            .aw { padding: 0.75em 0.7em; }
+
+            /* Header */
+            .aw-header { margin-bottom: 0.4em; }
+            .aw-header .sectionTitle { font-size: 1.2em; flex: 1 1 auto; min-width: 0; }
+
+            /* Tabs become a 2x2 segmented control so nothing scrolls off screen */
+            .aw-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4em; border-bottom: none; margin-bottom: 1em; }
+            .aw-tab { margin-bottom: 0; padding: 0.7em 0.4em; min-height: 42px; display: flex; align-items: center; justify-content: center; font-size: 0.85em; text-align: center; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; background: rgba(255,255,255,0.04); opacity: 0.8; overflow: hidden; text-overflow: ellipsis; }
+            .aw-tab.active { background: rgba(0,164,220,0.18); border-color: #00a4dc; color: #00a4dc; opacity: 1; }
+
+            /* Bigger touch targets. min-height is in px on purpose: an em value
+               would shrink along with the reduced font-size. */
+            .aw-btn { min-height: 38px; padding: 0.55em 1em; font-size: 0.88em; }
+            .aw-btn-sm { min-height: 34px; padding: 0.45em 0.85em; font-size: 0.82em; }
+            /* 16px only on TEXT inputs, which are what iOS zooms into on focus.
+               A <select> opens a native picker and never zooms, so it stays compact. */
+            .aw-search input, .aw-hist-input { font-size: 16px; padding: 0.55em 0.7em; min-height: 38px; }
+            .aw-lang-select, .aw-season-select, .aw-hist-filters select { font-size: 0.9em; padding: 0.45em 0.6em; min-height: 36px; }
+
+            /* Series detail */
+            .aw-series { flex-direction: column; align-items: center; text-align: center; margin-bottom: 1.2em; }
+            .aw-cover { width: min(180px, 45vw); }
+            .aw-meta h2 { justify-content: center; font-size: 1.25em; }
+            .aw-meta p { text-align: left; font-size: 0.9em; }
             .aw-genres { justify-content: center; }
-            .aw-grid { grid-template-columns: 1fr; }
-            .aw-stats { grid-template-columns: repeat(2, 1fr); }
-            .aw-hist-item { flex-direction: column; align-items: flex-start; }
-            .aw-hist-meta { width: 100%; justify-content: space-between; }
+
+            /* Season picker */
+            .aw-series-actions { margin-bottom: 0.9em; }
+            .aw-season-select { min-width: 11em; }
+
+            /* Season action bar: grouped card, nothing overflows */
+            .aw-season-actions {
+                display: flex; flex-direction: column; align-items: stretch; gap: 0.7em;
+                padding: 0.8em; margin-bottom: 0.9em;
+                background: rgba(255,255,255,0.03);
+                border: 1px solid rgba(255,255,255,0.07);
+                border-radius: 10px;
+            }
+            .aw-season-meta { flex-wrap: wrap; gap: 0.45em 0.6em; justify-content: space-between; }
+            .aw-season-actions .aw-ep-count { flex: 0 0 auto; font-size: 0.8em; }
+            .aw-season-meta .aw-lang-select { flex: 0 1 auto; width: auto; }
+            .aw-season-opts { gap: 1.4em; padding: 0.1em 0.1em 0.2em; }
+            .aw-check { font-size: 0.9em; opacity: 1; padding: 0.3em 0; min-height: 36px; }
+            .aw-check input { width: 18px; height: 18px; }
+            .aw-season-btns { flex-wrap: wrap; gap: 0.5em; }
+            .aw-season-btns .aw-btn { flex: 1 1 11em; }
+
+            /* Episodes: title row on top, actions on their own row */
+            .aw-ep { flex-wrap: wrap; gap: 0.45em 0.5em; padding: 0.7em 0.8em; }
+            .aw-ep-num { min-width: 2.2em; }
+            .aw-ep-title { flex: 1 1 55%; }
+            .aw-ep-actions { flex: 1 1 100%; justify-content: flex-end; }
+
+            /* Downloads: stacked card with full-width progress bar */
+            .aw-dl-item {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                grid-template-areas:
+                    "info   info"
+                    "bar    pct"
+                    "status btns";
+                align-items: center;
+                gap: 0.6em 0.7em;
+                padding: 0.8em;
+            }
+            .aw-dl-info { grid-area: info; }
+            .aw-dl-info strong { display: block; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.35; font-size: 0.95em; }
+            .aw-dl-info small { display: block; margin-top: 0.15em; font-size: 0.8em; }
+            .aw-dl-progress { grid-area: bar; width: 100%; height: 8px; }
+            .aw-dl-pct { grid-area: pct; min-width: 3.2em; }
+            .aw-dl-item > .aw-status { grid-area: status; justify-self: start; }
+            .aw-dl-btns { grid-area: btns; justify-self: end; gap: 0.4em; }
+            .aw-dl-btns .aw-btn { min-width: 44px; }
+
+            /* History */
+            .aw-hist-item { flex-direction: column; align-items: stretch; gap: 0.5em; padding: 0.75em 0.8em; }
+            .aw-hist-info strong { display: block; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.35; }
+            .aw-hist-info small { display: block; margin-top: 0.15em; }
+            .aw-hist-meta { width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 0.5em; }
+            .aw-hist-meta .aw-hist-size, .aw-hist-meta .aw-hist-date { min-width: 0; text-align: left; }
+            /* series box on its own row first, then status + Filter share a row */
+            .aw-hist-input { order: -1; flex: 1 1 100%; min-width: 0; }
+            .aw-hist-filters select { flex: 1 1 8em; min-width: 0; }
+            .aw-hist-filters .aw-btn { flex: 0 0 auto; }
+
+            /* Stats: 2 up, last card spans the row */
+            .aw-stats { grid-template-columns: repeat(2, 1fr); gap: 0.6em; margin-bottom: 1.2em; }
+            .aw-stat { padding: 0.85em 0.5em; }
+            .aw-stat-value { font-size: 1.35em; }
+            .aw-stat-label { font-size: 0.72em; }
+            .aw-stat:last-child { grid-column: 1 / -1; }
+
+            /* Browse */
+            .aw-browse-tabs { gap: 0.4em; margin-bottom: 1.2em; }
+            .aw-browse-pill { flex: 1 1 auto; padding: 0.6em 0.8em; min-height: 38px; font-size: 0.85em; }
+            .aw-browse-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.7em; }
+            .aw-browse-info { padding: 0.6em 0.7em; }
+            .aw-browse-info h3 { font-size: 1.05em; line-height: 1.3; }
+            .aw-browse-info-solo { padding-block: 1.25em; }
+
+            /* Misc */
+            .aw-warning { align-items: flex-start; font-size: 0.85em; padding: 0.7em 0.8em; }
+            .aw-empty { padding: 2em 1em; }
+            .aw-empty-icon { font-size: 2em; }
+            .aw-ep-providers { padding: 0.7em 0.8em; }
+        }
+
+        /* ── Small phone ── */
+        @media (max-width: 380px) {
+            .aw { padding: 0.6em 0.55em; }
+            .aw-header .sectionTitle { font-size: 1.1em; }
+            .aw-season-btns .aw-btn { flex: 1 1 100%; }
             .aw-browse-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.6em; }
+            .aw-ep-title { flex: 1 1 45%; }
+            .aw-stat-value { font-size: 1.2em; }
         }
         </style>
         <div data-role="content">
             <div class="content-primary aw">
-                <div class="sectionTitleContainer flex align-items-center" style="justify-content:space-between">
+                <div class="sectionTitleContainer aw-header">
                     <h2 class="sectionTitle">AniWorld Downloader</h2>
-                    <div style="display:flex;gap:0.5em;align-items:center">
-                        <a href="https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader" target="_blank" class="aw-btn aw-btn-secondary aw-btn-sm" title="View Source Code" style="text-decoration:none">
+                    <div class="aw-header-actions">
+                        <a href="https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader" target="_blank" class="aw-btn aw-btn-secondary aw-btn-sm" title="View Source Code">
                             <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                         </a>
-                        <a id="aw-settings-btn" href="#!/configurationpage?name=AniWorldConfig" class="aw-btn aw-btn-secondary aw-btn-sm" title="Plugin Settings" style="text-decoration:none">⚙️ Settings</a>
+                        <a id="aw-settings-btn" href="#!/configurationpage?name=AniWorldConfig" class="aw-btn aw-btn-secondary aw-btn-sm" title="Plugin Settings">⚙️ Settings</a>
                     </div>
                 </div>
 

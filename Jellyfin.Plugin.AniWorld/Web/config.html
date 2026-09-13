@@ -5,6 +5,21 @@
 </head>
 <body>
     <div id="AniWorldConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox" data-controller="__plugin/AniWorldConfigJS">
+        <style>
+        #AniWorldConfigPage .fieldDescription code,
+        #AniWorldConfigPage .fieldDescription a { overflow-wrap: anywhere; word-break: break-word; }
+        #AniWorldConfigPage .inputContainer input,
+        #AniWorldConfigPage .inputContainer select { max-width: 100%; }
+        @media (max-width: 640px) {
+            #AniWorldConfigPage .sectionTitle { font-size: 1.2em; }
+            #AniWorldConfigPage .fieldDescription { font-size: 0.85em; line-height: 1.45; }
+            /* 16px keeps iOS from zooming in when a field is focused */
+            #AniWorldConfigPage .inputContainer input,
+            #AniWorldConfigPage .inputContainer select { font-size: 16px; }
+            #AniWorldConfigPage .checkboxContainer label { display: flex; align-items: center; gap: 0.5em; }
+            #AniWorldConfigPage .button-submit { width: 100%; }
+        }
+        </style>
         <div data-role="content">
             <div class="content-primary">
                 <form id="AniWorldConfigForm">
