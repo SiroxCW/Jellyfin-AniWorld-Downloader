@@ -10,3 +10,6 @@ packages/
 .idea/
 /build/
 /publish/
+
+# local development/test environment (not part of the plugin)
+dev/
