@@ -318,7 +318,7 @@ public abstract class StreamingSiteService
     /// <summary>
     /// Resolves a redirect URL to the actual provider embed URL.
     /// </summary>
-    public async Task<string> ResolveRedirectAsync(string redirectUrl, CancellationToken cancellationToken = default)
+    public virtual async Task<string> ResolveRedirectAsync(string redirectUrl, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, redirectUrl);
         var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);

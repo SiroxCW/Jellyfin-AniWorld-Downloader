@@ -30,6 +30,7 @@ public class DownloadService
 
     private readonly AniWorldService _aniWorldService;
     private readonly StoService _stoService;
+    private readonly FilmoService _filmoService;
     private readonly DownloadHistoryService _historyService;
     private readonly IEnumerable<IStreamExtractor> _extractors;
     private readonly IMediaEncoder _mediaEncoder;
@@ -50,6 +51,7 @@ public class DownloadService
     public DownloadService(
         AniWorldService aniWorldService,
         StoService stoService,
+        FilmoService filmoService,
         DownloadHistoryService historyService,
         IEnumerable<IStreamExtractor> extractors,
         IMediaEncoder mediaEncoder,
@@ -58,6 +60,7 @@ public class DownloadService
     {
         _aniWorldService = aniWorldService;
         _stoService = stoService;
+        _filmoService = filmoService;
         _historyService = historyService;
         _extractors = extractors;
         _mediaEncoder = mediaEncoder;
@@ -121,9 +124,17 @@ public class DownloadService
     /// </summary>
     private StreamingSiteService GetService(string source)
     {
-        return string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase)
-            ? _stoService
-            : _aniWorldService;
+        if (string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase))
+        {
+            return _stoService;
+        }
+
+        if (string.Equals(source, "filmo", StringComparison.OrdinalIgnoreCase))
+        {
+            return _filmoService;
+        }
+
+        return _aniWorldService;
     }
 
     /// <summary>
@@ -499,7 +510,7 @@ public class DownloadService
             if (!matchedLang.Equals(task.Language, StringComparison.OrdinalIgnoreCase))
             {
                 var config = Plugin.Instance?.Configuration;
-                var isMovie = PathHelper.MovieFromUrl.IsMatch(task.EpisodeUrl);
+                var isMovie = PathHelper.IsMovieUrl(task.EpisodeUrl);
                 var oldBase = config?.GetDownloadPath(task.Source, task.Language, isMovie) ?? string.Empty;
                 var newBase = config?.GetDownloadPath(task.Source, matchedLang, isMovie) ?? string.Empty;
 
@@ -719,7 +730,8 @@ public class DownloadService
     /// </summary>
     private static string LanguageDisplayName(string langKey, string source)
     {
-        if (string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(source, "filmo", StringComparison.OrdinalIgnoreCase))
         {
             return langKey switch
             {
@@ -822,7 +834,7 @@ public class DownloadService
     /// </summary>
     private void CleanupEmptyParentDirectories(string filePath, string source, string? language = null, string? episodeUrl = null)
     {
-        var isMovie = !string.IsNullOrEmpty(episodeUrl) && PathHelper.MovieFromUrl.IsMatch(episodeUrl);
+        var isMovie = !string.IsNullOrEmpty(episodeUrl) && PathHelper.IsMovieUrl(episodeUrl);
         var basePath = Plugin.Instance?.Configuration.GetDownloadPath(source, language, isMovie) ?? string.Empty;
         if (string.IsNullOrEmpty(basePath))
         {

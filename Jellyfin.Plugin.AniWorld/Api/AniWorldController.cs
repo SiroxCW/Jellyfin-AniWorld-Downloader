@@ -29,6 +29,7 @@ public class AniWorldController : ControllerBase
 {
     private readonly AniWorldService _aniWorldService;
     private readonly StoService _stoService;
+    private readonly FilmoService _filmoService;
     private readonly DownloadService _downloadService;
     private readonly DownloadHistoryService _historyService;
     private readonly IServerConfigurationManager _configManager;
@@ -40,6 +41,7 @@ public class AniWorldController : ControllerBase
     public AniWorldController(
         AniWorldService aniWorldService,
         StoService stoService,
+        FilmoService filmoService,
         DownloadService downloadService,
         DownloadHistoryService historyService,
         IServerConfigurationManager configManager,
@@ -47,6 +49,7 @@ public class AniWorldController : ControllerBase
     {
         _aniWorldService = aniWorldService;
         _stoService = stoService;
+        _filmoService = filmoService;
         _downloadService = downloadService;
         _historyService = historyService;
         _configManager = configManager;
@@ -58,9 +61,17 @@ public class AniWorldController : ControllerBase
     /// </summary>
     private StreamingSiteService GetService(string? source)
     {
-        return string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase)
-            ? _stoService
-            : _aniWorldService;
+        if (string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase))
+        {
+            return _stoService;
+        }
+
+        if (string.Equals(source, "filmo", StringComparison.OrdinalIgnoreCase))
+        {
+            return _filmoService;
+        }
+
+        return _aniWorldService;
     }
 
     /// <summary>
@@ -146,6 +157,7 @@ public class AniWorldController : ControllerBase
         {
             aniworld = config?.AniWorldConfig.Enabled ?? true,
             sto = config?.StoConfig.Enabled ?? false,
+            filmo = config?.FilmoConfig.Enabled ?? false,
             aniWorldOnlyGerman = config?.AniWorldConfig.OnlyGermanLanguages ?? false,
             maintenanceMode = config?.MaintenanceMode ?? false,
             maintenanceMessage = config?.MaintenanceMessage ?? string.Empty
@@ -196,6 +208,19 @@ public class AniWorldController : ControllerBase
                 }
             }
 
+            if (config?.FilmoConfig.Enabled == true)
+            {
+                try
+                {
+                    var filmoResults = await _filmoService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+                    results.AddRange(filmoResults);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "filmo.to search failed for query: {Query}", query);
+                }
+            }
+
             return Ok(results);
         }
 
@@ -217,7 +242,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
@@ -239,7 +264,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
@@ -261,7 +286,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
@@ -327,7 +352,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.EpisodeUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.EpisodeUrl);
@@ -341,7 +366,7 @@ public class AniWorldController : ControllerBase
             return BadRequest("English Sub downloads are blocked for AniWorld. Only German Dub and German Sub are allowed.");
         }
 
-        var isMovieRequest = PathHelper.MovieFromUrl.IsMatch(request.EpisodeUrl);
+        var isMovieRequest = PathHelper.IsMovieUrl(request.EpisodeUrl);
         var basePath = config?.GetDownloadPath(source, language, isMovieRequest) ?? string.Empty;
 
         if (string.IsNullOrEmpty(basePath))
@@ -412,7 +437,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.SeasonUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.SeasonUrl);
@@ -524,7 +549,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.SeriesUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.SeriesUrl);
@@ -770,7 +795,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
         }
 
         var (season, episode) = PathHelper.ParseSeasonEpisode(url);
@@ -789,12 +814,13 @@ public class AniWorldController : ControllerBase
     [AllowAnonymous]
     public ActionResult GetFlag(string lang, string? source = null)
     {
-        var isSto = string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase);
+        var isDub = string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(source, "filmo", StringComparison.OrdinalIgnoreCase);
 
         string? resourceName = lang switch
         {
             "1" => "Jellyfin.Plugin.AniWorld.Web.german.svg",
-            "2" => isSto
+            "2" => isDub
                 ? "Jellyfin.Plugin.AniWorld.Web.english.svg"
                 : "Jellyfin.Plugin.AniWorld.Web.japanese-english.svg",
             "3" => "Jellyfin.Plugin.AniWorld.Web.japanese-german.svg",
@@ -828,6 +854,7 @@ public class AniWorldController : ControllerBase
         {
             "aniworld" => "Jellyfin.Plugin.AniWorld.Web.aniworld.svg",
             "sto" => "Jellyfin.Plugin.AniWorld.Web.sto.svg",
+            "filmo" => "Jellyfin.Plugin.AniWorld.Web.filmo.svg",
             _ => null
         };
 

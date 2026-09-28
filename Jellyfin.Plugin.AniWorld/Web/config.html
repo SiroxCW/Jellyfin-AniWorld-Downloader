@@ -293,6 +293,74 @@
                         </div>
                     </div>
 
+                    <!-- filmo.to Settings -->
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">filmo.to Downloader (Movies)</h3>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkFilmoEnabled" />
+                                <span>Enable filmo.to Downloader</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Enable searching and downloading movies from filmo.to.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtFilmoPath1">Download Path (German Dub)</label>
+                            <input is="emby-input" type="text" id="txtFilmoPath1"
+                                   placeholder="/media/movies" />
+                            <div class="fieldDescription">
+                                Base directory for German Dub movie downloads.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtFilmoPath2">Download Path (English Dub)</label>
+                            <input is="emby-input" type="text" id="txtFilmoPath2"
+                                   placeholder="/media/movies" />
+                            <div class="fieldDescription">
+                                Base directory for English Dub movie downloads. Leave empty to use the German Dub path.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selFilmoLanguage">Preferred Language</label>
+                            <select is="emby-select" id="selFilmoLanguage">
+                                <option value="1">German Dub (Deutsch)</option>
+                                <option value="2">English Dub (English)</option>
+                            </select>
+                            <div class="fieldDescription">Default language for filmo.to downloads.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selFilmoProvider">Preferred Provider</label>
+                            <select is="emby-select" id="selFilmoProvider">
+                                <option value="VOE">VOE (recommended)</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">Default streaming provider for filmo.to.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selFilmoFallback">Fallback Provider</label>
+                            <select is="emby-select" id="selFilmoFallback">
+                                <option value="">None (no fallback)</option>
+                                <option value="VOE">VOE</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">
+                                If all retries with the preferred provider fail, the download will be retried
+                                with this provider.
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <button is="emby-button" type="submit" class="raised button-submit block">
                             <span>Save</span>

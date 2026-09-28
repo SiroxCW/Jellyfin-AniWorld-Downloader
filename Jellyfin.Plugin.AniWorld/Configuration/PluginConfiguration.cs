@@ -101,6 +101,15 @@ public class PluginConfiguration : BasePluginConfiguration
         PreferredProvider = "VOE",
     };
 
+    /// <summary>
+    /// Gets or sets the filmo.to (movies) downloader configuration.
+    /// </summary>
+    public SiteDownloaderConfig FilmoConfig { get; set; } = new()
+    {
+        Enabled = true,
+        PreferredProvider = "VOE",
+    };
+
     // ── Legacy flat properties (backward compat / used as AniWorld defaults) ──
 
     /// <summary>
@@ -193,6 +202,7 @@ public class PluginConfiguration : BasePluginConfiguration
         return source?.ToLowerInvariant() switch
         {
             "sto" => StoConfig,
+            "filmo" => FilmoConfig,
             _ => AniWorldConfig,
         };
     }

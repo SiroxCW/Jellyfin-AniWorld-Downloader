@@ -12,10 +12,11 @@ public static class UrlValidator
         "aniworld.to", "www.aniworld.to",
         "s.to", "www.s.to",
         "serienstream.to", "www.serienstream.to",
+        "filmo.to", "www.filmo.to",
     };
 
     /// <summary>
-    /// Validates that a URL belongs to an allowed streaming site (aniworld.to or s.to).
+    /// Validates that a URL belongs to an allowed streaming site (aniworld.to, s.to or filmo.to).
     /// Prevents SSRF by rejecting URLs pointing to internal networks or other domains.
     /// </summary>
     public static bool IsValidUrl(string url)
@@ -73,19 +74,25 @@ public static class UrlValidator
         if (!IsValidUrl(url))
         {
             throw new ArgumentException(
-                "Invalid URL. Only https://aniworld.to and https://s.to URLs are accepted.", paramName);
+                "Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.", paramName);
         }
     }
 
     /// <summary>
     /// Detects the source site from a URL.
-    /// Returns "aniworld" or "sto".
+    /// Returns "aniworld", "sto" or "filmo".
     /// </summary>
     public static string DetectSource(string url)
     {
         if (string.IsNullOrWhiteSpace(url))
         {
             return "aniworld";
+        }
+
+        // filmo.to: fixed host, checked first
+        if (url.Contains("filmo.to", StringComparison.OrdinalIgnoreCase))
+        {
+            return "filmo";
         }
 
         // Get custom s.to host for matching

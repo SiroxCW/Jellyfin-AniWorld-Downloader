@@ -269,6 +269,18 @@ public class RebuildDownloadHistoryTask : IScheduledTask
             AddTarget(config.StoConfig.DownloadPath, config.GetPreferredLanguage("sto"), "sto");
         }
 
+        // Filmo per-language paths
+        foreach (var (langKey, path) in config.FilmoConfig.DownloadPaths)
+        {
+            AddTarget(path, langKey, "filmo");
+        }
+
+        // Filmo general/legacy path
+        if (!string.IsNullOrEmpty(config.FilmoConfig.DownloadPath))
+        {
+            AddTarget(config.FilmoConfig.DownloadPath, config.GetPreferredLanguage("filmo"), "filmo");
+        }
+
         // Legacy global DownloadPath
         if (!string.IsNullOrEmpty(config.DownloadPath))
         {

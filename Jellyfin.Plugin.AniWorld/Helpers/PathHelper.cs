@@ -26,12 +26,28 @@ public static class PathHelper
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
+    /// Regex to extract the movie slug from a filmo.to movie URL.
+    /// Supports /movies/{slug} (filmo.to).
+    /// </summary>
+    public static readonly Regex FilmoMovieFromUrl = new(
+        @"filmo\.to/movies/[\w-]+",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
     /// Regex to extract the series slug from a URL.
-    /// Supports /anime/stream/{slug} (aniworld) and /serie/{slug} (s.to).
+    /// Supports /anime/stream/{slug} (aniworld), /serie/{slug} (s.to) and /movies/{slug} (filmo.to).
     /// </summary>
     public static readonly Regex SeriesSlugFromUrl = new(
-        @"/(?:anime/stream|serie)/(?<slug>[^/?\#]+)",
+        @"/(?:anime/stream|serie|movies)/(?<slug>[^/?\#]+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Returns true when the URL points to a movie (aniworld/s.to movie page or a filmo.to movie page).
+    /// </summary>
+    public static bool IsMovieUrl(string url)
+    {
+        return MovieFromUrl.IsMatch(url) || FilmoMovieFromUrl.IsMatch(url);
+    }
 
     /// <summary>
     /// Sanitizes a file/folder name by removing invalid and problematic characters.
@@ -104,6 +120,15 @@ public static class PathHelper
         {
             var num = int.Parse(movieMatch.Groups["num"].Value);
             var fileName = $"{safeName} - S00E{num:D2}.mkv";
+
+            return Path.Combine(basePath, safeName, "Specials", fileName);
+        }
+
+        // filmo.to movies: same layout as aniworld movies so the rebuild
+        // task can parse them back (Specials + S00E00)
+        if (FilmoMovieFromUrl.IsMatch(episodeUrl))
+        {
+            var fileName = $"{safeName} - S00E00.mkv";
 
             return Path.Combine(basePath, safeName, "Specials", fileName);
         }

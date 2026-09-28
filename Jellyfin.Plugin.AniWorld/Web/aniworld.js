@@ -54,7 +54,7 @@ export default function (view, params) {
 
     // Language names per source (plain text)
     function getLangNames(source) {
-        if (source === 'sto') {
+        if (source === 'sto' || source === 'filmo') {
             return { '1': 'German Dub', '2': 'English Dub' };
         }
         return { '1': 'German Dub', '2': 'English Sub', '3': 'German Sub' };
@@ -72,7 +72,7 @@ export default function (view, params) {
     function getLangOptionsHtml(source) {
         var html = '<option value="">\uD83C\uDF10 Use Settings Default</option>';
         html += '<option value="1">\uD83C\uDDE9\uD83C\uDDEA German Dub</option>';
-        if (source === 'sto') {
+        if (source === 'sto' || source === 'filmo') {
             html += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Dub</option>';
         } else {
             html += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Sub</option>';
@@ -176,10 +176,25 @@ export default function (view, params) {
                 return [];
             }).catch(function () { return []; }));
 
+            // Load from filmo.to if enabled (uses EnabledSources endpoint)
+            promises.push(ApiClient.fetch({
+                url: ApiClient.getUrl('AniWorld/EnabledSources'),
+                type: 'GET', dataType: 'json'
+            }).then(function (sources) {
+                if (sources.filmo) {
+                    return ApiClient.fetch({
+                        url: ApiClient.getUrl(endpoint, { source: 'filmo' }),
+                        type: 'GET', dataType: 'json'
+                    }).catch(function () { return []; });
+                }
+                return [];
+            }).catch(function () { return []; }));
+
             Promise.all(promises).then(function (results) {
                 AW.browseLoaded[section] = true;
                 AW['browseCache_aniworld_' + section] = results[0] || [];
                 AW['browseCache_sto_' + section] = results[1] || [];
+                AW['browseCache_filmo_' + section] = results[2] || [];
                 AW._renderBrowseCombined(section, container);
             }).catch(function (err) {
                 container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">❌</div>Failed to load: ' + esc(err.message || 'Unknown error') + '</div>';
@@ -189,9 +204,10 @@ export default function (view, params) {
         _renderBrowseCombined: function (section, container) {
             var awItems = this['browseCache_aniworld_' + section] || [];
             var stoItems = this['browseCache_sto_' + section] || [];
+            var filmoItems = this['browseCache_filmo_' + section] || [];
             var html = '';
 
-            if (awItems.length === 0 && stoItems.length === 0) {
+            if (awItems.length === 0 && stoItems.length === 0 && filmoItems.length === 0) {
                 container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No content found.</div>';
                 return;
             }
@@ -204,6 +220,11 @@ export default function (view, params) {
             if (stoItems.length > 0) {
                 html += '<div class="aw-browse-section-title">s.to</div>';
                 html += this._buildBrowseGrid(stoItems, 'sto');
+            }
+
+            if (filmoItems.length > 0) {
+                html += '<div class="aw-browse-section-title">filmo.to</div>';
+                html += this._buildBrowseGrid(filmoItems, 'filmo');
             }
 
             container.innerHTML = html;

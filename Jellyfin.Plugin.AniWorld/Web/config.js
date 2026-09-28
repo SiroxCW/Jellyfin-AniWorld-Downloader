@@ -38,6 +38,16 @@ export default function (view, params) {
             view.querySelector('#selStoProvider').value = sto.PreferredProvider || 'VOE';
             view.querySelector('#selStoFallback').value = sto.FallbackProvider || '';
 
+            // filmo.to
+            var filmo = config.FilmoConfig || {};
+            var filmoFallback = filmo.DownloadPath || '';
+            view.querySelector('#chkFilmoEnabled').checked = filmo.Enabled === true;
+            view.querySelector('#txtFilmoPath1').value = filmo.DownloadPath1 || filmoFallback;
+            view.querySelector('#txtFilmoPath2').value = filmo.DownloadPath2 || '';
+            view.querySelector('#selFilmoLanguage').value = filmo.PreferredLanguage || '1';
+            view.querySelector('#selFilmoProvider').value = filmo.PreferredProvider || 'VOE';
+            view.querySelector('#selFilmoFallback').value = filmo.FallbackProvider || '';
+
             Dashboard.hideLoadingMsg();
         });
     }
@@ -84,6 +94,16 @@ export default function (view, params) {
             config.StoConfig.PreferredLanguage = view.querySelector('#selStoLanguage').value;
             config.StoConfig.PreferredProvider = view.querySelector('#selStoProvider').value;
             config.StoConfig.FallbackProvider = view.querySelector('#selStoFallback').value;
+
+            // filmo.to
+            if (!config.FilmoConfig) config.FilmoConfig = {};
+            config.FilmoConfig.Enabled = view.querySelector('#chkFilmoEnabled').checked;
+            config.FilmoConfig.DownloadPath1 = view.querySelector('#txtFilmoPath1').value.trim();
+            config.FilmoConfig.DownloadPath2 = view.querySelector('#txtFilmoPath2').value.trim();
+            config.FilmoConfig.DownloadPath = config.FilmoConfig.DownloadPath1;
+            config.FilmoConfig.PreferredLanguage = view.querySelector('#selFilmoLanguage').value;
+            config.FilmoConfig.PreferredProvider = view.querySelector('#selFilmoProvider').value;
+            config.FilmoConfig.FallbackProvider = view.querySelector('#selFilmoFallback').value;
 
             ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                 Dashboard.processPluginConfigurationUpdateResult();
