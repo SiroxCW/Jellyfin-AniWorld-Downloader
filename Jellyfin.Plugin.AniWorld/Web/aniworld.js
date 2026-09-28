@@ -1,5 +1,15 @@
 export default function (view, params) {
 
+    // Load the bundled Font Awesome stylesheet (the web client does not ship it).
+    // Idempotent: the element is removed on viewhide, so re-adding on re-open is safe.
+    if (!view.querySelector('#aw-fontawesome-css')) {
+        var faLink = document.createElement('link');
+        faLink.id = 'aw-fontawesome-css';
+        faLink.rel = 'stylesheet';
+        faLink.href = ApiClient.getUrl('AniWorld/fontawesome/css/all.min.css');
+        view.appendChild(faLink);
+    }
+
     function esc(str) {
         if (!str) return '';
         var d = document.createElement('div');
@@ -87,7 +97,7 @@ export default function (view, params) {
     }
 
     // Display names for the providers, used in the selector, placeholders and loading hints
-    var PROVIDER_NAMES = { aniworld: 'AniWorld', sto: 's.to', filmo: 'filmo.to' };
+    var PROVIDER_NAMES = { aniworld: 'AniWorld', sto: 'SerienStream', filmo: 'Filmo' };
 
     var AW = {
         currentSeriesTitle: null,
@@ -278,7 +288,7 @@ export default function (view, params) {
             var titles = this.PROVIDER_SECTIONS[source] || {};
 
             if (newItems.length === 0 && popularItems.length === 0) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No content found.</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-inbox"></i></div>No content found.</div>';
                 return;
             }
 
@@ -347,7 +357,7 @@ export default function (view, params) {
                 AW.lastSearchResults = results;
                 AW.renderSearchResults(results);
             }).catch(function (err) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\u274C</div>Search failed: ' + esc(err.message || 'Unknown error') + '</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-xmark-circle"></i></div>Search failed: ' + esc(err.message || 'Unknown error') + '</div>';
             });
         },
 
@@ -356,7 +366,7 @@ export default function (view, params) {
         renderSearchResults: function (results) {
             var content = view.querySelector('#aw-content');
             if (!results || results.length === 0) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDD0D</div>No results found. Try different keywords.</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-search"></i></div>No results found. Try different keywords.</div>';
                 return;
             }
 
@@ -423,17 +433,17 @@ export default function (view, params) {
                 AW.currentSeriesTitle = series.Title || title || 'Unknown';
                 AW.renderSeries(series, url);
             }).catch(function (err) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\u274C</div>Failed to load series: ' + esc(err.message || 'Unknown error') + '</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-xmark-circle"></i></div>Failed to load series: ' + esc(err.message || 'Unknown error') + '</div>';
             });
         },
 
         renderSeries: function (series, seriesUrl) {
             var content = view.querySelector('#aw-content');
             var source = this.currentSeriesSource || 'aniworld';
-            var html = '<button class="aw-btn aw-btn-secondary aw-back" onclick="window.AW.goBack()">\u2190 Back</button>';
+            var html = '<button class="aw-btn aw-btn-secondary aw-back" onclick="window.AW.goBack()"><i class="fa-solid fa-arrow-left"></i> Back</button>';
 
             if (source === 'sto' && series.Genres && series.Genres.some(function (g) { return g.toLowerCase() === 'anime'; })) {
-                html += '<div class="aw-warning">\u26A0\uFE0F For anime, using AniWorld as source is recommended.</div>';
+                html += '<div class="aw-warning"><i class="fa-solid fa-triangle-exclamation"></i> For anime, using AniWorld as source is recommended.</div>';
             }
 
             html += '<div class="aw-series">';
@@ -521,7 +531,7 @@ export default function (view, params) {
             var source = this.currentSeriesSource || 'aniworld';
 
             if (!episodes || episodes.length === 0) {
-                epContainer.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDCED</div>No episodes found.</div>';
+                epContainer.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-inbox"></i></div>No episodes found.</div>';
                 if (barContainer) barContainer.innerHTML = '';
                 return;
             }
@@ -539,9 +549,9 @@ export default function (view, params) {
                 bar += '<label class="aw-check" title="Redownload episodes even if they are already flagged as downloaded"><input type="checkbox" id="aw-force-cb"><span>Force</span></label>';
                 bar += '</div>';
                 bar += '<div class="aw-season-btns">';
-                bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')">\u2B07\uFE0F Download Season</button>';
+                bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')"><i class="fa-solid fa-download"></i> Download Season</button>';
                 if (AW.currentSeriesUrl) {
-                    bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')">\u2B07\uFE0F Download All Seasons</button>';
+                    bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')"><i class="fa-solid fa-download"></i> Download All Seasons</button>';
                 }
                 bar += '</div>';
                 bar += '</div>';
@@ -571,7 +581,7 @@ export default function (view, params) {
                 html += '<span class="aw-ep-title" id="' + epId + '-title">Loading...</span>';
                 html += '<span class="aw-ep-downloaded" id="' + epId + '-dl" style="display:none"></span>';
                 html += '<div class="aw-ep-actions">';
-                html += '<button class="aw-btn aw-btn-primary aw-btn-sm" onclick="window.AW.downloadEpisode(\'' + encodeURIComponent(ep.Url) + '\')">\u2B07\uFE0F Download</button>';
+                html += '<button class="aw-btn aw-btn-primary aw-btn-sm" onclick="window.AW.downloadEpisode(\'' + encodeURIComponent(ep.Url) + '\')"><i class="fa-solid fa-download"></i> Download</button>';
                 html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.toggleProviders(\'' + encodeURIComponent(ep.Url) + '\', \'' + epId + '\')">Providers</button>';
                 html += '</div>';
                 html += '</div>';
@@ -627,7 +637,7 @@ export default function (view, params) {
                 if (result && result.downloaded && result.languages && result.languages.length > 0) {
                     var badge = view.querySelector('#' + epId + '-dl');
                     if (badge) {
-                        var html = '\u2713 ';
+                        var html = '<i class="fa-solid fa-check"></i>';
                         for (var i = 0; i < result.languages.length; i++) {
                             html += '<img src="' + ApiClient.getUrl('AniWorld/Flag/' + result.languages[i], { source: source }) + '" style="height:1.1em;vertical-align:middle;margin-right:0.2em">';
                         }
@@ -864,7 +874,7 @@ export default function (view, params) {
             AW.updateBadge(active);
 
             if (!downloads || downloads.length === 0) {
-                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDCED</div>No active downloads.<br>Search for anime and start downloading!</div>';
+                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-inbox"></i></div>No active downloads.<br>Search for anime and start downloading!</div>';
                 return;
             }
 
@@ -887,7 +897,7 @@ export default function (view, params) {
 
             var html = '';
             if (hasCompleted) {
-                html += '<div class="aw-dl-actions"><button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.clearCompleted()">\uD83E\uDDF9 Clear Completed</button></div>';
+                html += '<div class="aw-dl-actions"><button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.clearCompleted()"><i class="fa-solid fa-broom"></i> Clear Completed</button></div>';
             }
 
             html += '<div class="aw-dl">';
@@ -918,7 +928,7 @@ export default function (view, params) {
                     html += '<div class="aw-dl-error">' + esc(dl.Error) + '</div>';
                 }
                 if (dl.Status === 'Retrying' && dl.Error) {
-                    html += '<div class="aw-dl-retry-info">\u23F3 ' + esc(dl.Error) + '</div>';
+                    html += '<div class="aw-dl-retry-info"><i class="fa-solid fa-hourglass-half"></i> ' + esc(dl.Error) + '</div>';
                 }
                 if (dl.LanguageFallbackNote) {
                     html += '<div class="aw-dl-retry-info">' + esc(dl.LanguageFallbackNote) + '</div>';
@@ -931,10 +941,10 @@ export default function (view, params) {
 
                 html += '<div class="aw-dl-btns">';
                 if (isActive) {
-                    html += '<button class="aw-btn aw-btn-danger aw-btn-sm" onclick="window.AW.cancelDownload(\'' + dl.Id + '\')" title="Cancel">\u2715</button>';
+                    html += '<button class="aw-btn aw-btn-danger aw-btn-sm" onclick="window.AW.cancelDownload(\'' + dl.Id + '\')" title="Cancel"><i class="fa-solid fa-xmark"></i></button>';
                 }
                 if (isFailed) {
-                    html += '<button class="aw-btn aw-btn-warning aw-btn-sm" onclick="window.AW.retryDownload(\'' + dl.Id + '\')" title="Retry">\uD83D\uDD04</button>';
+                    html += '<button class="aw-btn aw-btn-warning aw-btn-sm" onclick="window.AW.retryDownload(\'' + dl.Id + '\')" title="Retry"><i class="fa-solid fa-rotate-right"></i></button>';
                 }
                 html += '</div>';
 
@@ -1084,7 +1094,7 @@ export default function (view, params) {
             if (!container) return;
 
             if ((!records || records.length === 0) && reset) {
-                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDCED</div>No download history yet.<br>Downloaded episodes will appear here.</div>';
+                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-inbox"></i></div>No download history yet.<br>Downloaded episodes will appear here.</div>';
                 return;
             }
 
