@@ -22,11 +22,18 @@
         .aw-tab.active { border-bottom-color: #00a4dc; color: #00a4dc; opacity: 1; }
         .aw-tab .aw-badge { background: #00a4dc; color: #fff; border-radius: 10px; padding: 0.1em 0.5em; font-size: 0.75em; margin-left: 0.4em; }
 
-        /* Search */
-        .aw-search { display: flex; gap: 0.5em; margin-bottom: 1.5em; }
-        .aw-search input { flex: 1 1 auto; min-width: 0; padding: 0.6em 1em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: inherit; font-size: 1em; outline: none; }
-        .aw-search input:focus { border-color: #00a4dc; }
-        .aw-search .aw-btn { flex: 0 0 auto; }
+        /* Provider selector (segmented control with sliding thumb) */
+        .aw-provider { margin-bottom: 1.2em; }
+        .aw-provider-track { position: relative; display: inline-flex; max-width: 100%; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 4px; }
+        .aw-provider-thumb { position: absolute; top: 4px; left: 0; height: calc(100% - 8px); width: 0; background: rgba(0,164,220,0.28); border: 1px solid rgba(0,164,220,0.55); border-radius: 8px; transition: transform 0.25s ease, width 0.25s ease; }
+        .aw-provider-btn { position: relative; z-index: 1; flex: 0 0 auto; padding: 0.55em 1.4em; border: none; background: transparent; color: inherit; opacity: 0.6; cursor: pointer; font-size: 0.92em; border-radius: 8px; white-space: nowrap; transition: opacity 0.2s; font-family: inherit; }
+        .aw-provider-btn.active { opacity: 1; color: #fff; }
+
+        /* Search bar */
+        .aw-search-bar { display: flex; gap: 0.5em; margin-bottom: 1.5em; }
+        .aw-search-bar input { flex: 1 1 auto; min-width: 0; padding: 0.6em 1em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: inherit; font-size: 1em; outline: none; }
+        .aw-search-bar input:focus { border-color: #00a4dc; }
+        .aw-search-bar .aw-btn { flex: 0 0 auto; white-space: nowrap; }
 
         /* Buttons */
         .aw-btn { padding: 0.5em 1em; border-radius: 6px; border: none; cursor: pointer; font-size: 0.85em; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.4em; line-height: 1.2; }
@@ -143,12 +150,6 @@
         .aw-hist-input:focus, .aw-hist-filters select:focus { border-color: #00a4dc; outline: none; }
         .aw-hist-more { text-align: center; padding: 1em; }
 
-        /* Browse tabs */
-        .aw-browse-tabs { display: flex; gap: 0.5em; margin-bottom: 1.5em; flex-wrap: wrap; }
-        .aw-browse-pill { padding: 0.5em 1.2em; border-radius: 20px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: inherit; cursor: pointer; font-size: 0.9em; transition: all 0.2s; white-space: nowrap; }
-        .aw-browse-pill:hover { background: rgba(0,164,220,0.15); border-color: rgba(0,164,220,0.3); }
-        .aw-browse-pill.active { background: rgba(0,164,220,0.3); border-color: #00a4dc; color: #fff; }
-
         /* Browse grid with cover images */
         .aw-browse-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1em; }
         .aw-browse-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; cursor: pointer; transition: all 0.2s; position: relative; }
@@ -194,8 +195,8 @@
             .aw-header { margin-bottom: 0.4em; }
             .aw-header .sectionTitle { font-size: 1.2em; flex: 1 1 auto; min-width: 0; }
 
-            /* Tabs become a 2x2 segmented control so nothing scrolls off screen */
-            .aw-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4em; border-bottom: none; margin-bottom: 1em; }
+            /* Tabs become a segmented control so nothing scrolls off screen */
+            .aw-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4em; border-bottom: none; margin-bottom: 1em; }
             .aw-tab { margin-bottom: 0; padding: 0.7em 0.4em; min-height: 42px; display: flex; align-items: center; justify-content: center; font-size: 0.85em; text-align: center; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; background: rgba(255,255,255,0.04); opacity: 0.8; overflow: hidden; text-overflow: ellipsis; }
             .aw-tab.active { background: rgba(0,164,220,0.18); border-color: #00a4dc; color: #00a4dc; opacity: 1; }
 
@@ -205,8 +206,15 @@
             .aw-btn-sm { min-height: 34px; padding: 0.45em 0.85em; font-size: 0.82em; }
             /* 16px only on TEXT inputs, which are what iOS zooms into on focus.
                A <select> opens a native picker and never zooms, so it stays compact. */
-            .aw-search input, .aw-hist-input { font-size: 16px; padding: 0.55em 0.7em; min-height: 38px; }
+            .aw-search-bar input, .aw-hist-input { font-size: 16px; padding: 0.55em 0.7em; min-height: 38px; }
             .aw-lang-select, .aw-season-select, .aw-hist-filters select { font-size: 0.9em; padding: 0.45em 0.6em; min-height: 36px; }
+
+            /* Provider selector + search bar: fill the width, buttons get their own row */
+            .aw-provider-track { width: 100%; }
+            .aw-provider-btn { flex: 1 1 0; }
+            .aw-search-bar { flex-wrap: wrap; }
+            .aw-search-bar input { flex: 1 1 100%; }
+            .aw-search-bar .aw-btn { flex: 1 1 auto; }
 
             /* Series detail */
             .aw-series { flex-direction: column; align-items: center; text-align: center; margin-bottom: 1.2em; }
@@ -282,8 +290,6 @@
             .aw-stat:last-child { grid-column: 1 / -1; }
 
             /* Browse */
-            .aw-browse-tabs { gap: 0.4em; margin-bottom: 1.2em; }
-            .aw-browse-pill { flex: 1 1 auto; padding: 0.6em 0.8em; min-height: 38px; font-size: 0.85em; }
             .aw-browse-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.7em; }
             .aw-browse-info { padding: 0.6em 0.7em; }
             .aw-browse-info h3 { font-size: 1.05em; line-height: 1.3; }
@@ -323,26 +329,23 @@
                 </div>
 
                 <div class="aw-tabs">
-                    <div class="aw-tab active" data-tab="search" onclick="window.AW.switchTab('search')">🔍 Search</div>
-                    <div class="aw-tab" data-tab="browse" onclick="window.AW.switchTab('browse')">🌟 Browse</div>
+                    <div class="aw-tab active" data-tab="browse" onclick="window.AW.switchTab('browse')">🌟 Browse</div>
                     <div class="aw-tab" data-tab="downloads" onclick="window.AW.switchTab('downloads')">⬇️ Downloads <span id="aw-dl-badge" class="aw-badge" style="display:none">0</span></div>
                     <div class="aw-tab" data-tab="history" onclick="window.AW.switchTab('history')">📊 History</div>
                 </div>
 
-                <div id="searchTab">
-                    <div class="aw-search">
-                        <input type="text" id="aw-search-input" placeholder="Search anime and series..." />
+                <div id="browseTab">
+                    <div class="aw-provider" id="aw-provider">
+                        <div class="aw-provider-track" id="aw-provider-track">
+                            <div class="aw-provider-thumb" id="aw-provider-thumb"></div>
+                        </div>
+                    </div>
+                    <div class="aw-search-bar">
+                        <input type="text" id="aw-search-input" placeholder="Search..." />
                         <button class="aw-btn aw-btn-primary" onclick="window.AW.search()">Search</button>
+                        <button class="aw-btn aw-btn-secondary" onclick="window.AW.searchAll()">Search All</button>
                     </div>
                     <div id="aw-content"></div>
-                </div>
-
-                <div id="browseTab" style="display:none">
-                    <div class="aw-browse-tabs">
-                        <button class="aw-browse-pill active" data-section="popular" onclick="window.AW.switchBrowseSection('popular', this)">🔥 Popular</button>
-                        <button class="aw-browse-pill" data-section="new" onclick="window.AW.switchBrowseSection('new', this)">✨ New Releases</button>
-                    </div>
-                    <div id="aw-browse-content"></div>
                 </div>
 
                 <div id="downloadsTab" style="display:none">
