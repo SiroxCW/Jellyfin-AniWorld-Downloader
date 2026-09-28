@@ -324,6 +324,21 @@ export default function (view, params) {
         },
 
         // ── Search ──
+        // "Search" always reads at the same width as "Search All": both buttons get a
+        // min-width of the wider button's natural width, so the pair stays a matched
+        // unit in every viewport. Re-synced when the layout or the fonts change.
+        _syncSearchBtnWidths: function () {
+            var search = view.querySelector('#aw-search-btn');
+            var searchAll = view.querySelector('#aw-search-all-btn');
+            if (!search || !searchAll) return;
+            search.style.minWidth = '';
+            searchAll.style.minWidth = '';
+            var w = Math.max(search.offsetWidth, searchAll.offsetWidth);
+            if (!w) return; // browse tab hidden: nothing to measure, re-syncs on show
+            search.style.minWidth = w + 'px';
+            searchAll.style.minWidth = w + 'px';
+        },
+
         search: function () {
             this._runSearch(this._searchQuery(), false);
         },
@@ -1208,6 +1223,18 @@ export default function (view, params) {
                 AW.search();
             }
         });
+    }
+
+    // Keep both search buttons the same width (see _syncSearchBtnWidths).
+    AW._syncSearchBtnWidths();
+    var searchBar = view.querySelector('.aw-search-bar');
+    if (searchBar && typeof ResizeObserver !== 'undefined') {
+        // Observing the row (not the buttons): their min-width doesn't change the
+        // row's size, so this can't feed back into itself.
+        new ResizeObserver(function () { AW._syncSearchBtnWidths(); }).observe(searchBar);
+    }
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () { AW._syncSearchBtnWidths(); });
     }
 
     // Poll badge count periodically
