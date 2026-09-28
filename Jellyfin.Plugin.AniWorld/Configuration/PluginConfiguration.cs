@@ -52,8 +52,8 @@ public class PluginConfiguration : BasePluginConfiguration
     public string ProxyUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets a custom base URL for s.to (e.g. "https://serienstream.to").
-    /// Leave empty to use the default "https://s.to".
+    /// Gets or sets a custom base URL for s.to (e.g. "https://s.to").
+    /// Leave empty to use the default "https://serienstream.to".
     /// </summary>
     public string StoBaseUrl { get; set; } = string.Empty;
 

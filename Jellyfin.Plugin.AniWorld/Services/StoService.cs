@@ -86,7 +86,7 @@ public class StoService : StreamingSiteService
         get
         {
             var custom = Plugin.Instance?.Configuration?.StoBaseUrl;
-            return string.IsNullOrWhiteSpace(custom) ? "https://s.to" : custom.TrimEnd('/');
+            return string.IsNullOrWhiteSpace(custom) ? "https://serienstream.to" : custom.TrimEnd('/');
         }
     }
 
