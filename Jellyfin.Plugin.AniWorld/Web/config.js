@@ -77,6 +77,36 @@ export default function (view, params) {
             view.querySelector('#selFilmoProvider').value = filmo.PreferredProvider || 'VOE';
             view.querySelector('#selFilmoFallback').value = filmo.FallbackProvider || '';
 
+            // FilmPalast
+            var filmPalast = config.FilmPalastConfig || {};
+            var filmPalastFallback = filmPalast.DownloadPath || '';
+            view.querySelector('#chkFilmPalastEnabled').checked = filmPalast.Enabled === true;
+            view.querySelector('#txtFilmPalastPath1').value = filmPalast.DownloadPath1 || filmPalastFallback;
+            view.querySelector('#txtFilmPalastPath2').value = filmPalast.DownloadPath2 || '';
+            view.querySelector('#selFilmPalastLanguage').value = filmPalast.PreferredLanguage || '1';
+            view.querySelector('#selFilmPalastProvider').value = filmPalast.PreferredProvider || 'VOE';
+            view.querySelector('#selFilmPalastFallback').value = filmPalast.FallbackProvider || '';
+
+            // MegaKino
+            var megaKino = config.MegaKinoConfig || {};
+            var megaKinoFallback = megaKino.DownloadPath || '';
+            view.querySelector('#chkMegaKinoEnabled').checked = megaKino.Enabled === true;
+            view.querySelector('#txtMegaKinoPath1').value = megaKino.DownloadPath1 || megaKinoFallback;
+            view.querySelector('#txtMegaKinoPath2').value = megaKino.DownloadPath2 || '';
+            view.querySelector('#selMegaKinoLanguage').value = megaKino.PreferredLanguage || '1';
+            view.querySelector('#selMegaKinoProvider').value = megaKino.PreferredProvider || 'VOE';
+            view.querySelector('#selMegaKinoFallback').value = megaKino.FallbackProvider || '';
+
+            // Moflix
+            var moflix = config.MoflixConfig || {};
+            var moflixFallback = moflix.DownloadPath || '';
+            view.querySelector('#chkMoflixEnabled').checked = moflix.Enabled === true;
+            view.querySelector('#txtMoflixPath1').value = moflix.DownloadPath1 || moflixFallback;
+            view.querySelector('#txtMoflixPath2').value = moflix.DownloadPath2 || '';
+            view.querySelector('#selMoflixLanguage').value = moflix.PreferredLanguage || '1';
+            view.querySelector('#selMoflixProvider').value = moflix.PreferredProvider || 'MoflixClick';
+            view.querySelector('#selMoflixFallback').value = moflix.FallbackProvider || '';
+
             Dashboard.hideLoadingMsg();
         });
     }
@@ -133,6 +163,36 @@ export default function (view, params) {
             config.FilmoConfig.PreferredLanguage = view.querySelector('#selFilmoLanguage').value;
             config.FilmoConfig.PreferredProvider = view.querySelector('#selFilmoProvider').value;
             config.FilmoConfig.FallbackProvider = view.querySelector('#selFilmoFallback').value;
+
+            // FilmPalast
+            if (!config.FilmPalastConfig) config.FilmPalastConfig = {};
+            config.FilmPalastConfig.Enabled = view.querySelector('#chkFilmPalastEnabled').checked;
+            config.FilmPalastConfig.DownloadPath1 = view.querySelector('#txtFilmPalastPath1').value.trim();
+            config.FilmPalastConfig.DownloadPath2 = view.querySelector('#txtFilmPalastPath2').value.trim();
+            config.FilmPalastConfig.DownloadPath = config.FilmPalastConfig.DownloadPath1;
+            config.FilmPalastConfig.PreferredLanguage = view.querySelector('#selFilmPalastLanguage').value;
+            config.FilmPalastConfig.PreferredProvider = view.querySelector('#selFilmPalastProvider').value;
+            config.FilmPalastConfig.FallbackProvider = view.querySelector('#selFilmPalastFallback').value;
+
+            // MegaKino
+            if (!config.MegaKinoConfig) config.MegaKinoConfig = {};
+            config.MegaKinoConfig.Enabled = view.querySelector('#chkMegaKinoEnabled').checked;
+            config.MegaKinoConfig.DownloadPath1 = view.querySelector('#txtMegaKinoPath1').value.trim();
+            config.MegaKinoConfig.DownloadPath2 = view.querySelector('#txtMegaKinoPath2').value.trim();
+            config.MegaKinoConfig.DownloadPath = config.MegaKinoConfig.DownloadPath1;
+            config.MegaKinoConfig.PreferredLanguage = view.querySelector('#selMegaKinoLanguage').value;
+            config.MegaKinoConfig.PreferredProvider = view.querySelector('#selMegaKinoProvider').value;
+            config.MegaKinoConfig.FallbackProvider = view.querySelector('#selMegaKinoFallback').value;
+
+            // Moflix
+            if (!config.MoflixConfig) config.MoflixConfig = {};
+            config.MoflixConfig.Enabled = view.querySelector('#chkMoflixEnabled').checked;
+            config.MoflixConfig.DownloadPath1 = view.querySelector('#txtMoflixPath1').value.trim();
+            config.MoflixConfig.DownloadPath2 = view.querySelector('#txtMoflixPath2').value.trim();
+            config.MoflixConfig.DownloadPath = config.MoflixConfig.DownloadPath1;
+            config.MoflixConfig.PreferredLanguage = view.querySelector('#selMoflixLanguage').value;
+            config.MoflixConfig.PreferredProvider = view.querySelector('#selMoflixProvider').value;
+            config.MoflixConfig.FallbackProvider = view.querySelector('#selMoflixFallback').value;
 
             ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                 Dashboard.processPluginConfigurationUpdateResult();

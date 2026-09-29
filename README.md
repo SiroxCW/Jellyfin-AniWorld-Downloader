@@ -3,7 +3,7 @@
 ![GitHub Release](https://img.shields.io/github/v/release/SiroxCW/Jellyfin-AniWorld-Downloader)
 ![GitHub License](https://img.shields.io/github/license/SiroxCW/Jellyfin-AniWorld-Downloader)
 
-A Jellyfin plugin for searching and downloading anime and series from [aniworld.to](https://aniworld.to) and [s.to](https://s.to), directly inside Jellyfin's web interface.
+A Jellyfin plugin for searching and downloading anime and series from [aniworld.to](https://aniworld.to), [s.to](https://s.to), [filmo.to](https://filmo.to), [FilmPalast](https://filmpalast.to), [MegaKino](https://megakino.com) and [Moflix](https://moflix-stream.xyz), directly inside Jellyfin's web interface.
 
 Series View| Search View
 :---:|:---:
@@ -13,9 +13,9 @@ Series View| Search View
 
 - **Search and browse** anime and series with cover art, popular titles, and new releases
 - **Download** individual episodes, full seasons, or entire series
-- **Two sites supported**: aniworld.to (anime) and s.to (series)
-- **Multiple languages**: German Dub, German Sub, English Sub (aniworld), German Dub, English Dub (s.to)
-- **Multiple providers**: VOE, Filemoon, Vidoza and Vidmoly
+- **Six sites supported**: aniworld.to (anime), s.to (series), filmo.to (movies), FilmPalast (movies), MegaKino (movies &amp; series) and Moflix (movies &amp; series)
+- **Multiple languages**: German Dub, German Sub, English Sub (aniworld); German Dub and English Dub (s.to, filmo.to, FilmPalast, MegaKino, Moflix)
+- **Multiple providers**: VOE, Filemoon, Vidoza, Vidmoly, MegaKino (gxplayer) and MoflixClick
 - **Download manager** with real-time progress, cancel, retry, and batch operations
 - **Automatic retries** with exponential backoff and provider fallback
 - **Auto library scan** so new episodes appear in Jellyfin immediately
@@ -91,9 +91,9 @@ After installing, go to **Dashboard > Plugins > AniWorld Downloader** to configu
 | Movie download path | Default save location for movies (should point to a Jellyfin library folder) |
 | Language Fallback order | When the requested language is unavailable, fall back to other languages in the chosen priority order (default: No Fallback) |
 
-### Per-site settings (aniworld.to / s.to)
+### Per-site settings
 
-Each site can be enabled or disabled independently and has its own settings. If a per-site setting is left empty, the global default is used.
+Each site (aniworld.to, s.to, filmo.to, FilmPalast, MegaKino, Moflix) can be enabled or disabled independently and has its own settings. If a per-site setting is left empty, the global default is used.
 
 | Setting | Description |
 |---------|-------------|

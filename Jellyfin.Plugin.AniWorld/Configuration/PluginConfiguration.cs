@@ -110,6 +110,33 @@ public class PluginConfiguration : BasePluginConfiguration
         PreferredProvider = "VOE",
     };
 
+    /// <summary>
+    /// Gets or sets the filmpalast.to (movies) downloader configuration.
+    /// </summary>
+    public SiteDownloaderConfig FilmPalastConfig { get; set; } = new()
+    {
+        Enabled = true,
+        PreferredProvider = "VOE",
+    };
+
+    /// <summary>
+    /// Gets or sets the megakino (movies and series) downloader configuration.
+    /// </summary>
+    public SiteDownloaderConfig MegaKinoConfig { get; set; } = new()
+    {
+        Enabled = true,
+        PreferredProvider = "VOE",
+    };
+
+    /// <summary>
+    /// Gets or sets the moflix-stream.xyz (movies and series) downloader configuration.
+    /// </summary>
+    public SiteDownloaderConfig MoflixConfig { get; set; } = new()
+    {
+        Enabled = true,
+        PreferredProvider = "MoflixClick",
+    };
+
     // ── Legacy flat properties (backward compat / used as AniWorld defaults) ──
 
     /// <summary>
@@ -203,6 +230,9 @@ public class PluginConfiguration : BasePluginConfiguration
         {
             "sto" => StoConfig,
             "filmo" => FilmoConfig,
+            "filmpalast" => FilmPalastConfig,
+            "megakino" => MegaKinoConfig,
+            "moflix" => MoflixConfig,
             _ => AniWorldConfig,
         };
     }

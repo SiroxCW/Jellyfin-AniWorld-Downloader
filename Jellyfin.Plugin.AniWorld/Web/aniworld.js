@@ -62,9 +62,15 @@ export default function (view, params) {
         }
     }
 
+    // Sources that carry a full English DUB (not just subtitles).
+    function isDubSource(source) {
+        return source === 'sto' || source === 'filmo' || source === 'filmpalast'
+            || source === 'megakino' || source === 'moflix';
+    }
+
     // Language names per source (plain text)
     function getLangNames(source) {
-        if (source === 'sto' || source === 'filmo') {
+        if (isDubSource(source)) {
             return { '1': 'German Dub', '2': 'English Dub' };
         }
         return { '1': 'German Dub', '2': 'English Sub', '3': 'German Sub' };
@@ -82,7 +88,7 @@ export default function (view, params) {
     function getLangOptionsHtml(source) {
         var html = '<option value="">\uD83C\uDF10 Use Settings Default</option>';
         html += '<option value="1">\uD83C\uDDE9\uD83C\uDDEA German Dub</option>';
-        if (source === 'sto' || source === 'filmo') {
+        if (isDubSource(source)) {
             html += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Dub</option>';
         } else {
             html += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Sub</option>';
@@ -97,7 +103,14 @@ export default function (view, params) {
     }
 
     // Display names for the providers, used in the selector, placeholders and loading hints
-    var PROVIDER_NAMES = { aniworld: 'AniWorld', sto: 'SerienStream', filmo: 'Filmo' };
+    var PROVIDER_NAMES = {
+        aniworld: 'AniWorld',
+        sto: 'SerienStream',
+        filmo: 'Filmo',
+        filmpalast: 'FilmPalast',
+        megakino: 'MegaKino',
+        moflix: 'Moflix'
+    };
 
     var AW = {
         currentSeriesTitle: null,
@@ -116,7 +129,7 @@ export default function (view, params) {
         aniWorldOnlyGerman: false,
 
         // ── Browse / provider state ──
-        enabledSources: { aniworld: true, sto: false, filmo: false },
+        enabledSources: { aniworld: true, sto: false, filmo: false, filmpalast: false, megakino: false, moflix: false },
         currentProvider: 'aniworld',
         viewMode: 'browse',         // 'browse' | 'search' | 'series'
         providerBrowse: {},         // { [source]: { new: BrowseItem[], popular: BrowseItem[] } }
@@ -153,7 +166,10 @@ export default function (view, params) {
         PROVIDER_SECTIONS: {
             aniworld: { new: 'New Animes', popular: 'Popular Animes' },
             sto: { new: 'New Series', popular: 'Popular Series' },
-            filmo: { new: 'New Movies', popular: 'Popular Movies' }
+            filmo: { new: 'New Movies', popular: 'Popular Movies' },
+            filmpalast: { new: 'New Movies', popular: 'Popular Movies' },
+            megakino: { new: 'New Titles', popular: 'Popular Titles' },
+            moflix: { new: 'New Titles', popular: 'Popular Titles' }
         },
 
         // Render the provider buttons (only the enabled ones) and position the sliding thumb
@@ -161,7 +177,7 @@ export default function (view, params) {
             var track = view.querySelector('#aw-provider-track');
             if (!track) return;
 
-            var enabled = ['aniworld', 'sto', 'filmo'].filter(function (s) { return AW.enabledSources[s]; });
+            var enabled = ['aniworld', 'sto', 'filmo', 'filmpalast', 'megakino', 'moflix'].filter(function (s) { return AW.enabledSources[s]; });
             if (enabled.length === 0) enabled = ['aniworld'];
 
             // If the current provider got disabled in the settings, fall back to the first enabled one
@@ -1196,7 +1212,10 @@ export default function (view, params) {
         AW.enabledSources = {
             aniworld: sources.aniworld !== false,
             sto: sources.sto === true,
-            filmo: sources.filmo === true
+            filmo: sources.filmo === true,
+            filmpalast: sources.filmpalast === true,
+            megakino: sources.megakino === true,
+            moflix: sources.moflix === true
         };
         AW.buildProviderControl();
         AW.showCurrentView();

@@ -79,6 +79,15 @@
                     <button type="button" class="awcfg-tab" role="tab" data-pane="filmo" aria-selected="false">
                         <i class="fa-solid fa-film" aria-hidden="true"></i><span>Filmo</span>
                     </button>
+                    <button type="button" class="awcfg-tab" role="tab" data-pane="filmpalast" aria-selected="false">
+                        <i class="fa-solid fa-building-columns" aria-hidden="true"></i><span>FilmPalast</span>
+                    </button>
+                    <button type="button" class="awcfg-tab" role="tab" data-pane="megakino" aria-selected="false">
+                        <i class="fa-solid fa-star" aria-hidden="true"></i><span>MegaKino</span>
+                    </button>
+                    <button type="button" class="awcfg-tab" role="tab" data-pane="moflix" aria-selected="false">
+                        <i class="fa-solid fa-play" aria-hidden="true"></i><span>Moflix</span>
+                    </button>
                 </div>
 
                 <form id="AniWorldConfigForm">
@@ -422,6 +431,214 @@
                                 </div>
                             </div>
                         </div>
+                    </section>
+
+                    <!-- FilmPalast (filmpalast.to) -->
+                    <section class="awcfg-pane" data-pane="filmpalast" role="tabpanel" aria-label="FilmPalast" hidden>
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">FilmPalast (filmpalast.to) — Movies</h3>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkFilmPalastEnabled" />
+                                <span>Enable FilmPalast Downloader</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Enable searching and downloading movies from filmpalast.to.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtFilmPalastPath1">Download Path (German Dub)</label>
+                            <input is="emby-input" type="text" id="txtFilmPalastPath1"
+                                   placeholder="/media/movies" />
+                            <div class="fieldDescription">
+                                Base directory for German Dub movie downloads.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtFilmPalastPath2">Download Path (English Dub)</label>
+                            <input is="emby-input" type="text" id="txtFilmPalastPath2"
+                                   placeholder="/media/movies" />
+                            <div class="fieldDescription">
+                                Base directory for English Dub movie downloads. Leave empty to use the German Dub path.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selFilmPalastLanguage">Preferred Language</label>
+                            <select is="emby-select" id="selFilmPalastLanguage">
+                                <option value="1">German Dub (Deutsch)</option>
+                                <option value="2">English Dub (English)</option>
+                            </select>
+                            <div class="fieldDescription">Default language for FilmPalast downloads.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selFilmPalastProvider">Preferred Provider</label>
+                            <select is="emby-select" id="selFilmPalastProvider">
+                                <option value="VOE">VOE (recommended)</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">Default streaming provider for FilmPalast.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selFilmPalastFallback">Fallback Provider</label>
+                            <select is="emby-select" id="selFilmPalastFallback">
+                                <option value="">None (no fallback)</option>
+                                <option value="VOE">VOE</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">
+                                If all retries with the preferred provider fail, the download will be retried
+                                with this provider.
+                            </div>
+                        </div>
+                    </div>
+                    </section>
+
+                    <!-- MegaKino (dynamic domain) -->
+                    <section class="awcfg-pane" data-pane="megakino" role="tabpanel" aria-label="MegaKino" hidden>
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">MegaKino — Movies &amp; Series</h3>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkMegaKinoEnabled" />
+                                <span>Enable MegaKino Downloader</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Enable searching and downloading from MegaKino.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtMegaKinoPath1">Download Path (German Dub)</label>
+                            <input is="emby-input" type="text" id="txtMegaKinoPath1"
+                                   placeholder="/media/movies" />
+                            <div class="fieldDescription">
+                                Base directory for German Dub downloads.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtMegaKinoPath2">Download Path (English Dub)</label>
+                            <input is="emby-input" type="text" id="txtMegaKinoPath2"
+                                   placeholder="/media/movies" />
+                            <div class="fieldDescription">
+                                Base directory for English Dub downloads. Leave empty to use the German Dub path.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selMegaKinoLanguage">Preferred Language</label>
+                            <select is="emby-select" id="selMegaKinoLanguage">
+                                <option value="1">German Dub (Deutsch)</option>
+                                <option value="2">English Dub (English)</option>
+                            </select>
+                            <div class="fieldDescription">Default language for MegaKino downloads.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selMegaKinoProvider">Preferred Provider</label>
+                            <select is="emby-select" id="selMegaKinoProvider">
+                                <option value="VOE">VOE (recommended)</option>
+                                <option value="MegaKino">MegaKino (gxplayer)</option>
+                            </select>
+                            <div class="fieldDescription">Default streaming provider for MegaKino.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selMegaKinoFallback">Fallback Provider</label>
+                            <select is="emby-select" id="selMegaKinoFallback">
+                                <option value="">None (no fallback)</option>
+                                <option value="VOE">VOE</option>
+                                <option value="MegaKino">MegaKino (gxplayer)</option>
+                            </select>
+                            <div class="fieldDescription">
+                                If all retries with the preferred provider fail, the download will be retried
+                                with this provider.
+                            </div>
+                        </div>
+                    </div>
+                    </section>
+
+                    <!-- Moflix (moflix-stream.xyz) -->
+                    <section class="awcfg-pane" data-pane="moflix" role="tabpanel" aria-label="Moflix" hidden>
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Moflix — Movies &amp; Series</h3>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkMoflixEnabled" />
+                                <span>Enable Moflix Downloader</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Enable searching and downloading from Moflix.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtMoflixPath1">Download Path (German Dub)</label>
+                            <input is="emby-input" type="text" id="txtMoflixPath1"
+                                   placeholder="/media/movies" />
+                            <div class="fieldDescription">
+                                Base directory for German Dub downloads.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtMoflixPath2">Download Path (English Dub)</label>
+                            <input is="emby-input" type="text" id="txtMoflixPath2"
+                                   placeholder="/media/movies" />
+                            <div class="fieldDescription">
+                                Base directory for English Dub downloads. Leave empty to use the German Dub path.
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selMoflixLanguage">Preferred Language</label>
+                            <select is="emby-select" id="selMoflixLanguage">
+                                <option value="1">German Dub (Deutsch)</option>
+                                <option value="2">English Dub (English)</option>
+                            </select>
+                            <div class="fieldDescription">Default language for Moflix downloads.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selMoflixProvider">Preferred Provider</label>
+                            <select is="emby-select" id="selMoflixProvider">
+                                <option value="MoflixClick">MoflixClick (recommended)</option>
+                                <option value="VOE">VOE</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">Default streaming provider for Moflix.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="selMoflixFallback">Fallback Provider</label>
+                            <select is="emby-select" id="selMoflixFallback">
+                                <option value="">None (no fallback)</option>
+                                <option value="MoflixClick">MoflixClick</option>
+                                <option value="VOE">VOE</option>
+                                <option value="Filemoon">Filemoon</option>
+                                <option value="Vidmoly">Vidmoly</option>
+                                <option value="Vidoza">Vidoza</option>
+                            </select>
+                            <div class="fieldDescription">
+                                If all retries with the preferred provider fail, the download will be retried
+                                with this provider.
+                            </div>
+                        </div>
+                    </div>
                     </section>
 
                     <div>

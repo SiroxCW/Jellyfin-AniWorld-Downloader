@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 
 namespace Jellyfin.Plugin.AniWorld.Helpers;
 
@@ -13,7 +14,17 @@ public static class UrlValidator
         "s.to", "www.s.to",
         "serienstream.to", "www.serienstream.to",
         "filmo.to", "www.filmo.to",
+        "filmpalast.to", "www.filmpalast.to",
+        "moflix-stream.xyz", "www.moflix-stream.xyz",
     };
+
+    /// <summary>
+    /// MegaKino rotates its domain (megakino.com, megakino21.com, ...). Match the
+    /// rotating host family with a pattern instead of a fixed allow-list entry.
+    /// </summary>
+    private static readonly Regex MegaKinoHostPattern = new(
+        @"^megakino\d*\.com$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
     /// Validates that a URL belongs to an allowed streaming site (aniworld.to, s.to or filmo.to).
@@ -57,6 +68,12 @@ public static class UrlValidator
             }
         }
 
+        // Allow the rotating MegaKino domain family
+        if (MegaKinoHostPattern.IsMatch(host))
+        {
+            return true;
+        }
+
         // Also allow the custom s.to base URL host
         if (customHost != null && host == customHost)
         {
@@ -74,7 +91,8 @@ public static class UrlValidator
         if (!IsValidUrl(url))
         {
             throw new ArgumentException(
-                "Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.", paramName);
+                "Invalid URL. Only https://aniworld.to, https://s.to, https://filmo.to, https://filmpalast.to, " +
+                "https://moflix-stream.xyz and MegaKino URLs are accepted.", paramName);
         }
     }
 
@@ -95,6 +113,18 @@ public static class UrlValidator
             return "filmo";
         }
 
+        // filmpalast.to / moflix-stream.xyz: fixed hosts, checked before the
+        // generic fallback so they are not mis-detected as aniworld
+        if (url.Contains("filmpalast.to", StringComparison.OrdinalIgnoreCase))
+        {
+            return "filmpalast";
+        }
+
+        if (url.Contains("moflix-stream.xyz", StringComparison.OrdinalIgnoreCase))
+        {
+            return "moflix";
+        }
+
         // Get custom s.to host for matching
         string? customStoHost = null;
         var customBaseUrl = Plugin.Instance?.Configuration?.StoBaseUrl;
@@ -110,6 +140,11 @@ public static class UrlValidator
                 || (customStoHost != null && host == customStoHost))
             {
                 return "sto";
+            }
+
+            if (MegaKinoHostPattern.IsMatch(host))
+            {
+                return "megakino";
             }
         }
 
