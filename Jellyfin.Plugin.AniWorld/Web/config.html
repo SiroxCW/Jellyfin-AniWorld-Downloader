@@ -19,347 +19,410 @@
             #AniWorldConfigPage .checkboxContainer label { display: flex; align-items: center; gap: 0.5em; }
             #AniWorldConfigPage .button-submit { width: 100%; }
         }
+
+        /* Settings tabs (horizontal, like the main page's tab bar) */
+        #AniWorldConfigPage .awcfg-tabs {
+            display: flex; gap: 0;
+            border-bottom: 2px solid rgba(128,128,128,0.25);
+            margin-bottom: 1.4em;
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+        #AniWorldConfigPage .awcfg-tab {
+            flex: 0 0 auto;
+            display: inline-flex; align-items: center; gap: 0.5em;
+            padding: 0.7em 1.4em;
+            margin-bottom: -2px;
+            border: none; border-bottom: 2px solid transparent;
+            background: transparent; color: inherit;
+            font: inherit; font-size: 0.95em;
+            cursor: pointer; opacity: 0.7;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        #AniWorldConfigPage .awcfg-tab i { font-size: 0.95em; }
+        #AniWorldConfigPage .awcfg-tab:hover { opacity: 1; }
+        #AniWorldConfigPage .awcfg-tab.active {
+            border-bottom-color: var(--accent-color, #00a4dc);
+            color: var(--accent-color, #00a4dc);
+            opacity: 1;
+        }
+        /* tighter tabs on phones (after the base rules so it wins on equal specificity);
+           sized so all four fit a 390px viewport without scrolling */
+        @media (max-width: 640px) {
+            #AniWorldConfigPage .awcfg-tab { padding: 0.5em 0.55em; font-size: 0.88em; gap: 0.35em; }
+        }
+        #AniWorldConfigPage .awcfg-pane { animation: awcfg-pane-in 0.18s ease; }
+        #AniWorldConfigPage .awcfg-pane[hidden] { display: none; }
+        @keyframes awcfg-pane-in {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: none; }
+        }
         </style>
         <div data-role="content">
             <div class="content-primary">
+                <div class="sectionTitleContainer flex align-items-center">
+                    <h2 class="sectionTitle">AniWorld Downloader Settings</h2>
+                </div>
+
+                <!-- Settings tabs -->
+                <div class="awcfg-tabs" role="tablist" aria-label="Settings sections">
+                    <button type="button" class="awcfg-tab active" role="tab" data-pane="general" aria-selected="true">
+                        <i class="fa-solid fa-sliders" aria-hidden="true"></i><span>General</span>
+                    </button>
+                    <button type="button" class="awcfg-tab" role="tab" data-pane="aniworld" aria-selected="false">
+                        <i class="fa-solid fa-tv" aria-hidden="true"></i><span>AniWorld</span>
+                    </button>
+                    <button type="button" class="awcfg-tab" role="tab" data-pane="sto" aria-selected="false">
+                        <i class="fa-solid fa-clapperboard" aria-hidden="true"></i><span>SerienStream</span>
+                    </button>
+                    <button type="button" class="awcfg-tab" role="tab" data-pane="filmo" aria-selected="false">
+                        <i class="fa-solid fa-film" aria-hidden="true"></i><span>Filmo</span>
+                    </button>
+                </div>
+
                 <form id="AniWorldConfigForm">
-                    <div class="sectionTitleContainer flex align-items-center">
-                        <h2 class="sectionTitle">AniWorld Downloader Settings</h2>
-                    </div>
+                    <!-- General -->
+                    <section class="awcfg-pane" data-pane="general" role="tabpanel" aria-label="General">
+                        <div class="verticalSection">
+                            <h3 class="sectionTitle">General</h3>
 
-                    <!-- General Settings -->
-                    <div class="verticalSection">
-                        <h3 class="sectionTitle">General</h3>
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtMaxDownloads">Max Concurrent Downloads</label>
+                                <input is="emby-input" type="number" id="txtMaxDownloads" min="1" max="5" />
+                                <div class="fieldDescription">Maximum number of simultaneous downloads (1-5). Lower values are recommended to avoid rate limiting.</div>
+                            </div>
 
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtMaxDownloads">Max Concurrent Downloads</label>
-                            <input is="emby-input" type="number" id="txtMaxDownloads" min="1" max="5" />
-                            <div class="fieldDescription">Maximum number of simultaneous downloads (1-5). Lower values are recommended to avoid rate limiting.</div>
-                        </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtMaxRetries">Max Retry Attempts</label>
+                                <input is="emby-input" type="number" id="txtMaxRetries" min="0" max="10" />
+                                <div class="fieldDescription">
+                                    Number of times to retry a failed download (0 = no retries).
+                                    Uses exponential backoff between attempts and will try alternative providers on failure.
+                                </div>
+                            </div>
 
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtMaxRetries">Max Retry Attempts</label>
-                            <input is="emby-input" type="number" id="txtMaxRetries" min="0" max="10" />
-                            <div class="fieldDescription">
-                                Number of times to retry a failed download (0 = no retries).
-                                Uses exponential backoff between attempts and will try alternative providers on failure.
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtLanguageFallbackOrder">Language Fallback Order</label>
+                                <select is="emby-select" id="txtLanguageFallbackOrder">
+                                    <option value="1" selected>No Fallback</option>
+                                    <option value="2">German DUB > German SUB > English SUB (Recommended)</option>
+                                    <option value="3">German DUB > English SUB > German SUB</option>
+                                    <option value="4">English SUB > German DUB > German SUB</option>
+                                    <option value="5">English SUB > German SUB > German DUB</option>
+                                    <option value="6">German SUB > German DUB > English SUB</option>
+                                    <option value="7">German SUB > English SUB > German DUB</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    The language the user requested is tried first. If it fails, it tries the selected priority, skipping the one which failed.
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="chkAutoScan" />
+                                    <span>Auto-scan library after download</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Automatically trigger a Jellyfin library scan when a download completes.
+                                    This makes new episodes appear in your library immediately.
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="chkNonAdminAccess" />
+                                    <span>Enable for non-admin users</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Allow non-admin users to access the AniWorld Downloader UI via the sidebar.
+                                    Requires the <a href="https://github.com/IAmParadox27/jellyfin-plugin-file-transformation" target="_blank">File Transformation</a> plugin (recommended) or falls back to direct index.html modification.
+                                    <strong>A server restart is required after changing this setting.</strong>
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="chkMaintenanceMode" />
+                                    <span>Enable Maintenance Mode</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Block new downloads while allowing the current queue to finish.
+                                    Users will see a maintenance message and download buttons will be disabled.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtMaintenanceMessage">Maintenance Message</label>
+                                <input is="emby-input" type="text" id="txtMaintenanceMessage"
+                                       placeholder="The downloader is currently under maintenance..." />
+                                <div class="fieldDescription">Message displayed to users when maintenance mode is active.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtProxyUrl">Proxy Server</label>
+                                <input is="emby-input" type="text" id="txtProxyUrl"
+                                       placeholder="http://proxy:8080" />
+                                <div class="fieldDescription">
+                                    HTTP proxy for all network requests and downloads (e.g. <code>http://proxy:8080</code> or <code>socks5://proxy:1080</code>).
+                                    Leave empty to connect directly without a proxy.
+                                    <strong>A server restart is required after changing this setting.</strong>
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtMoviePath">Movie Download Path</label>
+                                <input is="emby-input" type="text" id="txtMoviePath"
+                                       placeholder="/media/movies" />
+                                <div class="fieldDescription">
+                                    Optional dedicated base directory for movie downloads across all sources.
+                                    Leave empty to use the normal site/language download paths.
+                                </div>
                             </div>
                         </div>
+                    </section>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="chkAutoScan" />
-                                <span>Auto-scan library after download</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Automatically trigger a Jellyfin library scan when a download completes.
-                                This makes new episodes appear in your library immediately.
+                    <!-- AniWorld -->
+                    <section class="awcfg-pane" data-pane="aniworld" role="tabpanel" aria-label="AniWorld" hidden>
+                        <div class="verticalSection">
+                            <h3 class="sectionTitle">AniWorld (aniworld.to)</h3>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="chkAniWorldEnabled" />
+                                    <span>Enable AniWorld Downloader</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Enable searching and downloading anime from aniworld.to.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtAniWorldPath1">Download Path (German Dub)</label>
+                                <input is="emby-input" type="text" id="txtAniWorldPath1"
+                                       placeholder="/media/anime" />
+                                <div class="fieldDescription">
+                                    Base directory for German Dub downloads. Files will be organized as:
+                                    <code>Path/SeriesName/Season XX/SeriesName - SXXEXX.mkv</code>
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtAniWorldPath2">Download Path (English Sub)</label>
+                                <input is="emby-input" type="text" id="txtAniWorldPath2"
+                                       placeholder="/media/anime" />
+                                <div class="fieldDescription">
+                                    Base directory for English Sub downloads. Leave empty to use the German Dub path.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtAniWorldPath3">Download Path (German Sub)</label>
+                                <input is="emby-input" type="text" id="txtAniWorldPath3"
+                                       placeholder="/media/anime" />
+                                <div class="fieldDescription">
+                                    Base directory for German Sub downloads. Leave empty to use the German Dub path.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="selAniWorldLanguage">Preferred Language</label>
+                                <select is="emby-select" id="selAniWorldLanguage">
+                                    <option value="1">German Dub (Deutsch)</option>
+                                    <option value="2">English Sub (Eng Sub)</option>
+                                    <option value="3">German Sub (Ger Sub)</option>
+                                </select>
+                                <div class="fieldDescription">Default language for AniWorld downloads.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="selAniWorldProvider">Preferred Provider</label>
+                                <select is="emby-select" id="selAniWorldProvider">
+                                    <option value="VOE">VOE</option>
+                                    <option value="Filemoon">Filemoon</option>
+                                    <option value="Vidmoly">Vidmoly (recommended)</option>
+                                    <option value="Vidoza">Vidoza</option>
+                                </select>
+                                <div class="fieldDescription">Default streaming provider for AniWorld. Vidmoly offers superior download speeds when available. VOE is a good fallback due to its wide availability.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="selAniWorldFallback">Fallback Provider</label>
+                                <select is="emby-select" id="selAniWorldFallback">
+                                    <option value="">None (no fallback)</option>
+                                    <option value="VOE">VOE</option>
+                                    <option value="Filemoon">Filemoon</option>
+                                    <option value="Vidmoly">Vidmoly</option>
+                                    <option value="Vidoza">Vidoza</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    If all retries with the preferred provider fail, the download will be retried
+                                    with this provider.
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="chkAniWorldOnlyGerman" />
+                                    <span>Only allow German Sub and German Dub</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    When enabled, only German Dub and German Sub downloads are allowed for AniWorld. English Sub will be blocked.
+                                </div>
                             </div>
                         </div>
+                    </section>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="chkNonAdminAccess" />
-                                <span>Enable for non-admin users</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Allow non-admin users to access the AniWorld Downloader UI via the sidebar.
-                                Requires the <a href="https://github.com/IAmParadox27/jellyfin-plugin-file-transformation" target="_blank">File Transformation</a> plugin (recommended) or falls back to direct index.html modification.
-                                <strong>A server restart is required after changing this setting.</strong>
+                    <!-- SerienStream (s.to) -->
+                    <section class="awcfg-pane" data-pane="sto" role="tabpanel" aria-label="SerienStream" hidden>
+                        <div class="verticalSection">
+                            <h3 class="sectionTitle">SerienStream (s.to)</h3>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="chkStoEnabled" />
+                                    <span>Enable s.to Downloader</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Enable searching and downloading TV series from s.to.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtStoBaseUrl">Custom Base URL</label>
+                                <input is="emby-input" type="text" id="txtStoBaseUrl"
+                                       placeholder="https://serienstream.to" />
+                                <div class="fieldDescription">
+                                    Override the s.to base URL. Use this if serienstream.to does not resolve on your network.
+                                    For example, set to <code>https://s.to</code> as an alternative.
+                                    Leave empty to use the default (https://serienstream.to).
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtStoPath1">Download Path (German Dub)</label>
+                                <input is="emby-input" type="text" id="txtStoPath1"
+                                       placeholder="/media/series" />
+                                <div class="fieldDescription">
+                                    Base directory for German Dub downloads.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtStoPath2">Download Path (English Dub)</label>
+                                <input is="emby-input" type="text" id="txtStoPath2"
+                                       placeholder="/media/series" />
+                                <div class="fieldDescription">
+                                    Base directory for English Dub downloads. Leave empty to use the German Dub path.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="selStoLanguage">Preferred Language</label>
+                                <select is="emby-select" id="selStoLanguage">
+                                    <option value="1">German Dub (Deutsch)</option>
+                                    <option value="2">English Dub (English)</option>
+                                </select>
+                                <div class="fieldDescription">Default language for s.to downloads.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="selStoProvider">Preferred Provider</label>
+                                <select is="emby-select" id="selStoProvider">
+                                    <option value="VOE">VOE (recommended)</option>
+                                    <option value="Filemoon">Filemoon</option>
+                                    <option value="Vidmoly">Vidmoly</option>
+                                    <option value="Vidoza">Vidoza</option>
+                                </select>
+                                <div class="fieldDescription">Default streaming provider for s.to.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="selStoFallback">Fallback Provider</label>
+                                <select is="emby-select" id="selStoFallback">
+                                    <option value="">None (no fallback)</option>
+                                    <option value="VOE">VOE</option>
+                                    <option value="Filemoon">Filemoon</option>
+                                    <option value="Vidmoly">Vidmoly</option>
+                                    <option value="Vidoza">Vidoza</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    If all retries with the preferred provider fail, the download will be retried
+                                    with this provider.
+                                </div>
                             </div>
                         </div>
+                    </section>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="chkMaintenanceMode" />
-                                <span>Enable Maintenance Mode</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Block new downloads while allowing the current queue to finish.
-                                Users will see a maintenance message and download buttons will be disabled.
+                    <!-- Filmo (filmo.to) -->
+                    <section class="awcfg-pane" data-pane="filmo" role="tabpanel" aria-label="Filmo" hidden>
+                        <div class="verticalSection">
+                            <h3 class="sectionTitle">Filmo (filmo.to)</h3>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="chkFilmoEnabled" />
+                                    <span>Enable filmo.to Downloader</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Enable searching and downloading movies from filmo.to.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtFilmoPath1">Download Path (German Dub)</label>
+                                <input is="emby-input" type="text" id="txtFilmoPath1"
+                                       placeholder="/media/movies" />
+                                <div class="fieldDescription">
+                                    Base directory for German Dub movie downloads.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="txtFilmoPath2">Download Path (English Dub)</label>
+                                <input is="emby-input" type="text" id="txtFilmoPath2"
+                                       placeholder="/media/movies" />
+                                <div class="fieldDescription">
+                                    Base directory for English Dub movie downloads. Leave empty to use the German Dub path.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="selFilmoLanguage">Preferred Language</label>
+                                <select is="emby-select" id="selFilmoLanguage">
+                                    <option value="1">German Dub (Deutsch)</option>
+                                    <option value="2">English Dub (English)</option>
+                                </select>
+                                <div class="fieldDescription">Default language for filmo.to downloads.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="selFilmoProvider">Preferred Provider</label>
+                                <select is="emby-select" id="selFilmoProvider">
+                                    <option value="VOE">VOE (recommended)</option>
+                                    <option value="Filemoon">Filemoon</option>
+                                    <option value="Vidmoly">Vidmoly</option>
+                                    <option value="Vidoza">Vidoza</option>
+                                </select>
+                                <div class="fieldDescription">Default streaming provider for filmo.to.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel" for="selFilmoFallback">Fallback Provider</label>
+                                <select is="emby-select" id="selFilmoFallback">
+                                    <option value="">None (no fallback)</option>
+                                    <option value="VOE">VOE</option>
+                                    <option value="Filemoon">Filemoon</option>
+                                    <option value="Vidmoly">Vidmoly</option>
+                                    <option value="Vidoza">Vidoza</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    If all retries with the preferred provider fail, the download will be retried
+                                    with this provider.
+                                </div>
                             </div>
                         </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtMaintenanceMessage">Maintenance Message</label>
-                            <input is="emby-input" type="text" id="txtMaintenanceMessage"
-                                   placeholder="The downloader is currently under maintenance..." />
-                            <div class="fieldDescription">Message displayed to users when maintenance mode is active.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtProxyUrl">Proxy Server</label>
-                            <input is="emby-input" type="text" id="txtProxyUrl"
-                                   placeholder="http://proxy:8080" />
-                            <div class="fieldDescription">
-                                HTTP proxy for all network requests and downloads (e.g. <code>http://proxy:8080</code> or <code>socks5://proxy:1080</code>).
-                                Leave empty to connect directly without a proxy.
-                                <strong>A server restart is required after changing this setting.</strong>
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtMoviePath">Movie Download Path</label>
-                            <input is="emby-input" type="text" id="txtMoviePath"
-                                   placeholder="/media/movies" />
-                            <div class="fieldDescription">
-                                Optional dedicated base directory for movie downloads across all sources.
-                                Leave empty to use the normal site/language download paths.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="inputContainer">
-                        <label class="inputLabel" for="txtLanguageFallbackOrder">Language Fallback Order</label>
-                        <select is="emby-select" id="txtLanguageFallbackOrder">
-                            <option value="1" selected>No Fallback</option>
-                            <option value="2">German DUB > German SUB > English SUB (Recommended)</option>
-                            <option value="3">German DUB > English SUB > German SUB</option>
-                            <option value="4">English SUB > German DUB > German SUB</option>
-                            <option value="5">English SUB > German SUB > German DUB</option>
-                            <option value="6">German SUB > German DUB > English SUB</option>
-                            <option value="7">German SUB > English SUB > German DUB</option>
-                        </select>
-                        <div class="fieldDescription">
-                            The language the user requested is tried first. If it fails, it tries the selected priority, skipping the one which failed.
-                        </div>
-                    </div>
-
-                    <!-- AniWorld Settings -->
-                    <div class="verticalSection">
-                        <h3 class="sectionTitle">AniWorld Downloader (aniworld.to)</h3>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="chkAniWorldEnabled" />
-                                <span>Enable AniWorld Downloader</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Enable searching and downloading anime from aniworld.to.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtAniWorldPath1">Download Path (German Dub)</label>
-                            <input is="emby-input" type="text" id="txtAniWorldPath1"
-                                   placeholder="/media/anime" />
-                            <div class="fieldDescription">
-                                Base directory for German Dub downloads. Files will be organized as:
-                                <code>Path/SeriesName/Season XX/SeriesName - SXXEXX.mkv</code>
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtAniWorldPath2">Download Path (English Sub)</label>
-                            <input is="emby-input" type="text" id="txtAniWorldPath2"
-                                   placeholder="/media/anime" />
-                            <div class="fieldDescription">
-                                Base directory for English Sub downloads. Leave empty to use the German Dub path.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtAniWorldPath3">Download Path (German Sub)</label>
-                            <input is="emby-input" type="text" id="txtAniWorldPath3"
-                                   placeholder="/media/anime" />
-                            <div class="fieldDescription">
-                                Base directory for German Sub downloads. Leave empty to use the German Dub path.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selAniWorldLanguage">Preferred Language</label>
-                            <select is="emby-select" id="selAniWorldLanguage">
-                                <option value="1">German Dub (Deutsch)</option>
-                                <option value="2">English Sub (Eng Sub)</option>
-                                <option value="3">German Sub (Ger Sub)</option>
-                            </select>
-                            <div class="fieldDescription">Default language for AniWorld downloads.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selAniWorldProvider">Preferred Provider</label>
-                            <select is="emby-select" id="selAniWorldProvider">
-                                <option value="VOE">VOE</option>
-                                <option value="Filemoon">Filemoon</option>
-                                <option value="Vidmoly">Vidmoly (recommended)</option>
-                                <option value="Vidoza">Vidoza</option>
-                            </select>
-                            <div class="fieldDescription">Default streaming provider for AniWorld. Vidmoly offers superior download speeds when available. VOE is a good fallback due to its wide availability.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selAniWorldFallback">Fallback Provider</label>
-                            <select is="emby-select" id="selAniWorldFallback">
-                                <option value="">None (no fallback)</option>
-                                <option value="VOE">VOE</option>
-                                <option value="Filemoon">Filemoon</option>
-                                <option value="Vidmoly">Vidmoly</option>
-                                <option value="Vidoza">Vidoza</option>
-                            </select>
-                            <div class="fieldDescription">
-                                If all retries with the preferred provider fail, the download will be retried
-                                with this provider.
-                            </div>
-                        </div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="chkAniWorldOnlyGerman" />
-                                <span>Only allow German Sub and German Dub</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                When enabled, only German Dub and German Sub downloads are allowed for AniWorld. English Sub will be blocked.
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- s.to Settings -->
-                    <div class="verticalSection">
-                        <h3 class="sectionTitle">s.to Downloader (SerienStream)</h3>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="chkStoEnabled" />
-                                <span>Enable s.to Downloader</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Enable searching and downloading TV series from s.to.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtStoBaseUrl">Custom Base URL</label>
-                            <input is="emby-input" type="text" id="txtStoBaseUrl"
-                                   placeholder="https://serienstream.to" />
-                            <div class="fieldDescription">
-                                Override the s.to base URL. Use this if serienstream.to does not resolve on your network.
-                                For example, set to <code>https://s.to</code> as an alternative.
-                                Leave empty to use the default (https://serienstream.to).
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtStoPath1">Download Path (German Dub)</label>
-                            <input is="emby-input" type="text" id="txtStoPath1"
-                                   placeholder="/media/series" />
-                            <div class="fieldDescription">
-                                Base directory for German Dub downloads.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtStoPath2">Download Path (English Dub)</label>
-                            <input is="emby-input" type="text" id="txtStoPath2"
-                                   placeholder="/media/series" />
-                            <div class="fieldDescription">
-                                Base directory for English Dub downloads. Leave empty to use the German Dub path.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selStoLanguage">Preferred Language</label>
-                            <select is="emby-select" id="selStoLanguage">
-                                <option value="1">German Dub (Deutsch)</option>
-                                <option value="2">English Dub (English)</option>
-                            </select>
-                            <div class="fieldDescription">Default language for s.to downloads.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selStoProvider">Preferred Provider</label>
-                            <select is="emby-select" id="selStoProvider">
-                                <option value="VOE">VOE (recommended)</option>
-                                <option value="Filemoon">Filemoon</option>
-                                <option value="Vidmoly">Vidmoly</option>
-                                <option value="Vidoza">Vidoza</option>
-                            </select>
-                            <div class="fieldDescription">Default streaming provider for s.to.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selStoFallback">Fallback Provider</label>
-                            <select is="emby-select" id="selStoFallback">
-                                <option value="">None (no fallback)</option>
-                                <option value="VOE">VOE</option>
-                                <option value="Filemoon">Filemoon</option>
-                                <option value="Vidmoly">Vidmoly</option>
-                                <option value="Vidoza">Vidoza</option>
-                            </select>
-                            <div class="fieldDescription">
-                                If all retries with the preferred provider fail, the download will be retried
-                                with this provider.
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- filmo.to Settings -->
-                    <div class="verticalSection">
-                        <h3 class="sectionTitle">filmo.to Downloader (Movies)</h3>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="chkFilmoEnabled" />
-                                <span>Enable filmo.to Downloader</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Enable searching and downloading movies from filmo.to.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtFilmoPath1">Download Path (German Dub)</label>
-                            <input is="emby-input" type="text" id="txtFilmoPath1"
-                                   placeholder="/media/movies" />
-                            <div class="fieldDescription">
-                                Base directory for German Dub movie downloads.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="txtFilmoPath2">Download Path (English Dub)</label>
-                            <input is="emby-input" type="text" id="txtFilmoPath2"
-                                   placeholder="/media/movies" />
-                            <div class="fieldDescription">
-                                Base directory for English Dub movie downloads. Leave empty to use the German Dub path.
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selFilmoLanguage">Preferred Language</label>
-                            <select is="emby-select" id="selFilmoLanguage">
-                                <option value="1">German Dub (Deutsch)</option>
-                                <option value="2">English Dub (English)</option>
-                            </select>
-                            <div class="fieldDescription">Default language for filmo.to downloads.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selFilmoProvider">Preferred Provider</label>
-                            <select is="emby-select" id="selFilmoProvider">
-                                <option value="VOE">VOE (recommended)</option>
-                                <option value="Filemoon">Filemoon</option>
-                                <option value="Vidmoly">Vidmoly</option>
-                                <option value="Vidoza">Vidoza</option>
-                            </select>
-                            <div class="fieldDescription">Default streaming provider for filmo.to.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel" for="selFilmoFallback">Fallback Provider</label>
-                            <select is="emby-select" id="selFilmoFallback">
-                                <option value="">None (no fallback)</option>
-                                <option value="VOE">VOE</option>
-                                <option value="Filemoon">Filemoon</option>
-                                <option value="Vidmoly">Vidmoly</option>
-                                <option value="Vidoza">Vidoza</option>
-                            </select>
-                            <div class="fieldDescription">
-                                If all retries with the preferred provider fail, the download will be retried
-                                with this provider.
-                            </div>
-                        </div>
-                    </div>
+                    </section>
 
                     <div>
                         <button is="emby-button" type="submit" class="raised button-submit block">

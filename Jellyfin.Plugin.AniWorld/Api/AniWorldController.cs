@@ -873,6 +873,51 @@ public class AniWorldController : ControllerBase
     }
 
     /// <summary>
+    /// Serves the bundled Font Awesome stylesheet. The UI page loads this so the
+    /// web client does not need Font Awesome itself.
+    /// </summary>
+    [HttpGet("fontawesome/css/all.min.css")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AllowAnonymous]
+    public ActionResult GetFontawesomeCss()
+    {
+        const string resourceName = "Jellyfin.Plugin.AniWorld.Web.fontawesome.css.all.min.css";
+        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
+        if (stream == null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "text/css");
+    }
+
+    /// <summary>
+    /// Serves a bundled Font Awesome webfont, referenced relatively by the stylesheet.
+    /// Only the solid font is shipped; the UI exclusively uses solid icons.
+    /// </summary>
+    [HttpGet("fontawesome/webfonts/{file}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AllowAnonymous]
+    public ActionResult GetFontawesomeWebfont(string file)
+    {
+        const string resourceName = "Jellyfin.Plugin.AniWorld.Web.fontawesome.webfonts.fa-solid-900.woff2";
+        if (!string.Equals(file, "fa-solid-900.woff2", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
+        if (stream == null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "font/woff2");
+    }
+
+    /// <summary>
     /// Delete a specific history record.
     /// </summary>
     [HttpDelete("History/{id}")]

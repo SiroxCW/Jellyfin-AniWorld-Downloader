@@ -1,6 +1,35 @@
 export default function (view, params) {
     var pluginId = 'e93d1d02-df60-4545-ae3c-7bb87dff024c';
 
+    // Load the bundled Font Awesome stylesheet (the web client does not ship it),
+    // same as the main page. Idempotent: the element is removed on viewhide, so
+    // re-adding on re-open is safe.
+    if (!view.querySelector('#awcfg-fontawesome-css')) {
+        var faLink = document.createElement('link');
+        faLink.id = 'awcfg-fontawesome-css';
+        faLink.rel = 'stylesheet';
+        faLink.href = ApiClient.getUrl('AniWorld/fontawesome/css/all.min.css');
+        view.appendChild(faLink);
+    }
+
+    // Settings tabs: one pane per section, switched by the tab bar.
+    var tabs = view.querySelectorAll('.awcfg-tab');
+    var panes = view.querySelectorAll('.awcfg-pane');
+    function showTab(tab) {
+        var name = tab.getAttribute('data-pane');
+        tabs.forEach(function (t) {
+            var active = t === tab;
+            t.classList.toggle('active', active);
+            t.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        panes.forEach(function (p) {
+            p.hidden = p.getAttribute('data-pane') !== name;
+        });
+    }
+    tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () { showTab(tab); });
+    });
+
     function loadConfig() {
         Dashboard.showLoadingMsg();
         ApiClient.getPluginConfiguration(pluginId).then(function (config) {

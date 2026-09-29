@@ -1,5 +1,15 @@
 export default function (view, params) {
 
+    // Load the bundled Font Awesome stylesheet (the web client does not ship it).
+    // Idempotent: the element is removed on viewhide, so re-adding on re-open is safe.
+    if (!view.querySelector('#aw-fontawesome-css')) {
+        var faLink = document.createElement('link');
+        faLink.id = 'aw-fontawesome-css';
+        faLink.rel = 'stylesheet';
+        faLink.href = ApiClient.getUrl('AniWorld/fontawesome/css/all.min.css');
+        view.appendChild(faLink);
+    }
+
     function esc(str) {
         if (!str) return '';
         var d = document.createElement('div');
@@ -86,6 +96,9 @@ export default function (view, params) {
         return ApiClient.getUrl('AniWorld/SiteLogo/' + (source || 'aniworld'));
     }
 
+    // Display names for the providers, used in the selector, placeholders and loading hints
+    var PROVIDER_NAMES = { aniworld: 'AniWorld', sto: 'SerienStream', filmo: 'Filmo' };
+
     var AW = {
         currentSeriesTitle: null,
         currentSeriesUrl: null,
@@ -102,13 +115,17 @@ export default function (view, params) {
 
         aniWorldOnlyGerman: false,
 
-        browseLoaded: { popular: false, new: false },
+        // ── Browse / provider state ──
+        enabledSources: { aniworld: true, sto: false, filmo: false },
+        currentProvider: 'aniworld',
+        viewMode: 'browse',         // 'browse' | 'search' | 'series'
+        providerBrowse: {},         // { [source]: { new: BrowseItem[], popular: BrowseItem[] } }
+        lastSearchContext: null,    // { query, all } of the most recent search, for goBack
 
         // ── Tab switching ──
         switchTab: function (tab) {
             view.querySelectorAll('.aw-tab').forEach(function (t) { t.classList.remove('active'); });
             view.querySelector('[data-tab="' + tab + '"]').classList.add('active');
-            view.querySelector('#searchTab').style.display = tab === 'search' ? '' : 'none';
             view.querySelector('#browseTab').style.display = tab === 'browse' ? '' : 'none';
             view.querySelector('#downloadsTab').style.display = tab === 'downloads' ? '' : 'none';
             view.querySelector('#historyTab').style.display = tab === 'history' ? '' : 'none';
@@ -126,108 +143,165 @@ export default function (view, params) {
                 this.loadHistory(true);
             }
 
-            if (tab === 'search' && this.currentSeriesUrl) {
+            if (tab === 'browse') {
+                this.showCurrentView();
+            }
+        },
+
+        // ── Browse / provider ──
+        // Section titles per provider, like the main AniWorld-Downloader project
+        PROVIDER_SECTIONS: {
+            aniworld: { new: 'New Animes', popular: 'Popular Animes' },
+            sto: { new: 'New Series', popular: 'Popular Series' },
+            filmo: { new: 'New Movies', popular: 'Popular Movies' }
+        },
+
+        // Render the provider buttons (only the enabled ones) and position the sliding thumb
+        buildProviderControl: function () {
+            var track = view.querySelector('#aw-provider-track');
+            if (!track) return;
+
+            var enabled = ['aniworld', 'sto', 'filmo'].filter(function (s) { return AW.enabledSources[s]; });
+            if (enabled.length === 0) enabled = ['aniworld'];
+
+            // If the current provider got disabled in the settings, fall back to the first enabled one
+            if (enabled.indexOf(AW.currentProvider) === -1) {
+                AW.currentProvider = enabled[0];
+            }
+
+            // With a single enabled provider a selector would just be noise
+            var providerRow = view.querySelector('#aw-provider');
+            if (providerRow) providerRow.style.display = enabled.length > 1 ? '' : 'none';
+
+            // Rebuild buttons (the thumb stays)
+            track.querySelectorAll('.aw-provider-btn').forEach(function (b) { b.remove(); });
+            enabled.forEach(function (s) {
+                var btn = document.createElement('button');
+                btn.className = 'aw-provider-btn' + (s === AW.currentProvider ? ' active' : '');
+                btn.dataset.source = s;
+                btn.textContent = PROVIDER_NAMES[s];
+                btn.onclick = function () { AW.switchProvider(s); };
+                track.appendChild(btn);
+            });
+
+            this._setupThumbSync(track);
+            this._updateProviderThumb();
+            this._updateSearchPlaceholder();
+        },
+
+        // Keep the thumb in sync with the active button when the layout changes
+        // (window resize, the scrollbar appearing or disappearing, font loading).
+        _setupThumbSync: function (track) {
+            if (typeof ResizeObserver === 'undefined') return;
+            if (!AW._thumbRO) {
+                AW._thumbRO = new ResizeObserver(function () { AW._updateProviderThumb(); });
+                AW._thumbRO.observe(track);
+            }
+            // Buttons are rebuilt on every call, so observe the new ones (removed ones are gone)
+            track.querySelectorAll('.aw-provider-btn').forEach(function (b) { AW._thumbRO.observe(b); });
+        },
+
+        _updateProviderThumb: function () {
+            var track = view.querySelector('#aw-provider-track');
+            var thumb = view.querySelector('#aw-provider-thumb');
+            if (!track || !thumb) return;
+            var active = track.querySelector('.aw-provider-btn.active');
+            if (!active) {
+                thumb.style.width = '0px';
+                thumb.style.transform = 'translateX(0px)';
+                return;
+            }
+            // The thumb's base position (left:0) and the button's offsetLeft share the
+            // track's padding edge as origin, so offsetLeft can be used as-is.
+            thumb.style.width = active.offsetWidth + 'px';
+            thumb.style.transform = 'translateX(' + active.offsetLeft + 'px)';
+        },
+
+        _updateSearchPlaceholder: function () {
+            var input = view.querySelector('#aw-search-input');
+            if (input) input.placeholder = 'Search ' + (PROVIDER_NAMES[this.currentProvider] || '') + '...';
+        },
+
+        // Switch the selected provider: move thumb + placeholder, then show its browse rows
+        switchProvider: function (source) {
+            if (source === this.currentProvider) return;
+            this.currentProvider = source;
+            this.lastSearchContext = null;
+
+            view.querySelectorAll('.aw-provider-btn').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.source === source);
+            });
+            this._updateProviderThumb();
+            this._updateSearchPlaceholder();
+
+            this.showProviderBrowse(source);
+        },
+
+        // Decide what the Browse tab shows: the series detail, the last search, or the provider rows
+        showCurrentView: function () {
+            if (this.viewMode === 'series' && this.currentSeriesUrl) {
                 this.showSeries(encodeURIComponent(this.currentSeriesUrl), this.currentSeriesTitle, this.currentSeriesSource);
+                return;
             }
-
-            if (tab === 'browse' && !this.browseLoaded.popular) {
-                this.loadBrowseSection('popular');
+            if (this.viewMode === 'search' && this.lastSearchContext) {
+                this._runSearch(this.lastSearchContext.query, this.lastSearchContext.all);
+                return;
             }
+            this.showProviderBrowse(this.currentProvider);
         },
 
-        // ── Browse ──
-        switchBrowseSection: function (section, btn) {
-            view.querySelectorAll('.aw-browse-pill').forEach(function (b) { b.classList.remove('active'); });
-            if (btn) btn.classList.add('active');
-            this.loadBrowseSection(section);
-        },
+        // Show the New + Popular rows of one provider (cached per provider)
+        showProviderBrowse: function (source) {
+            this.viewMode = 'browse';
+            this.lastSearchContext = null;
 
-        loadBrowseSection: function (section) {
-            var container = view.querySelector('#aw-browse-content');
-            if (!container) return;
+            var content = view.querySelector('#aw-content');
+            if (!content) return;
 
-            if (this.browseLoaded[section]) {
-                this._renderBrowseCombined(section, container);
+            if (this.providerBrowse[source]) {
+                this._renderProviderBrowse(source, content);
                 return;
             }
 
-            container.innerHTML = '<div class="aw-loading"><span class="aw-spinner"></span> Loading...</div>';
+            content.innerHTML = '<div class="aw-loading"><span class="aw-spinner"></span> Loading...</div>';
 
-            var endpoint = section === 'new' ? 'AniWorld/New' : 'AniWorld/Popular';
-            var promises = [];
-
-            // Load from aniworld
-            promises.push(ApiClient.fetch({
-                url: ApiClient.getUrl(endpoint, { source: 'aniworld' }),
-                type: 'GET', dataType: 'json'
-            }).catch(function () { return []; }));
-
-            // Load from s.to if enabled (uses EnabledSources endpoint)
-            promises.push(ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/EnabledSources'),
-                type: 'GET', dataType: 'json'
-            }).then(function (sources) {
-                if (sources.sto) {
-                    return ApiClient.fetch({
-                        url: ApiClient.getUrl(endpoint, { source: 'sto' }),
-                        type: 'GET', dataType: 'json'
-                    }).catch(function () { return []; });
+            var self = this;
+            var load = function (endpoint) {
+                return ApiClient.fetch({
+                    url: ApiClient.getUrl(endpoint, { source: source }),
+                    type: 'GET', dataType: 'json'
+                }).catch(function () { return []; });
+            };
+            Promise.all([load('AniWorld/New'), load('AniWorld/Popular')]).then(function (results) {
+                self.providerBrowse[source] = { new: results[0] || [], popular: results[1] || [] };
+                // Only paint if the user is still looking at this provider's rows
+                if (self.currentProvider === source && self.viewMode === 'browse') {
+                    self._renderProviderBrowse(source, content);
                 }
-                return [];
-            }).catch(function () { return []; }));
-
-            // Load from filmo.to if enabled (uses EnabledSources endpoint)
-            promises.push(ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/EnabledSources'),
-                type: 'GET', dataType: 'json'
-            }).then(function (sources) {
-                if (sources.filmo) {
-                    return ApiClient.fetch({
-                        url: ApiClient.getUrl(endpoint, { source: 'filmo' }),
-                        type: 'GET', dataType: 'json'
-                    }).catch(function () { return []; });
-                }
-                return [];
-            }).catch(function () { return []; }));
-
-            Promise.all(promises).then(function (results) {
-                AW.browseLoaded[section] = true;
-                AW['browseCache_aniworld_' + section] = results[0] || [];
-                AW['browseCache_sto_' + section] = results[1] || [];
-                AW['browseCache_filmo_' + section] = results[2] || [];
-                AW._renderBrowseCombined(section, container);
-            }).catch(function (err) {
-                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">❌</div>Failed to load: ' + esc(err.message || 'Unknown error') + '</div>';
             });
         },
 
-        _renderBrowseCombined: function (section, container) {
-            var awItems = this['browseCache_aniworld_' + section] || [];
-            var stoItems = this['browseCache_sto_' + section] || [];
-            var filmoItems = this['browseCache_filmo_' + section] || [];
-            var html = '';
+        _renderProviderBrowse: function (source, content) {
+            var cache = this.providerBrowse[source] || {};
+            var newItems = cache.new || [];
+            var popularItems = cache.popular || [];
+            var titles = this.PROVIDER_SECTIONS[source] || {};
 
-            if (awItems.length === 0 && stoItems.length === 0 && filmoItems.length === 0) {
-                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No content found.</div>';
+            if (newItems.length === 0 && popularItems.length === 0) {
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-inbox"></i></div>No content found.</div>';
                 return;
             }
 
-            if (awItems.length > 0) {
-                html += '<div class="aw-browse-section-title">AniWorld</div>';
-                html += this._buildBrowseGrid(awItems, 'aniworld');
+            var html = '';
+            if (newItems.length > 0) {
+                html += '<div class="aw-browse-section-title">' + titles.new + '</div>';
+                html += this._buildBrowseGrid(newItems, source);
             }
-
-            if (stoItems.length > 0) {
-                html += '<div class="aw-browse-section-title">s.to</div>';
-                html += this._buildBrowseGrid(stoItems, 'sto');
+            if (popularItems.length > 0) {
+                html += '<div class="aw-browse-section-title">' + titles.popular + '</div>';
+                html += this._buildBrowseGrid(popularItems, source);
             }
-
-            if (filmoItems.length > 0) {
-                html += '<div class="aw-browse-section-title">filmo.to</div>';
-                html += this._buildBrowseGrid(filmoItems, 'filmo');
-            }
-
-            container.innerHTML = html;
+            content.innerHTML = html;
         },
 
         _buildBrowseGrid: function (items, source) {
@@ -249,33 +323,56 @@ export default function (view, params) {
             return html;
         },
 
-        renderBrowseItems: function (items, container) {
-            if (!items || items.length === 0) {
-                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No content found.</div>';
-                return;
-            }
-
-            container.innerHTML = this._buildBrowseGrid(items, 'aniworld');
+        // ── Search ──
+        // "Search" always reads at the same width as "Search All": both buttons get a
+        // min-width of the wider button's natural width, so the pair stays a matched
+        // unit in every viewport. Re-synced when the layout or the fonts change.
+        _syncSearchBtnWidths: function () {
+            var search = view.querySelector('#aw-search-btn');
+            var searchAll = view.querySelector('#aw-search-all-btn');
+            if (!search || !searchAll) return;
+            search.style.minWidth = '';
+            searchAll.style.minWidth = '';
+            var w = Math.max(search.offsetWidth, searchAll.offsetWidth);
+            if (!w) return; // browse tab hidden: nothing to measure, re-syncs on show
+            search.style.minWidth = w + 'px';
+            searchAll.style.minWidth = w + 'px';
         },
 
-        // ── Search ──
         search: function () {
-            var query = view.querySelector('#aw-search-input').value.trim();
+            this._runSearch(this._searchQuery(), false);
+        },
+
+        searchAll: function () {
+            this._runSearch(this._searchQuery(), true);
+        },
+
+        _searchQuery: function () {
+            var input = view.querySelector('#aw-search-input');
+            return input ? input.value.trim() : '';
+        },
+
+        // Search the selected provider (all = every enabled provider at once)
+        _runSearch: function (query, all) {
             if (!query) return;
 
             this.lastSearchQuery = query;
+            this.lastSearchContext = { query: query, all: !!all };
+            this.viewMode = 'search';
+
             var content = view.querySelector('#aw-content');
-            content.innerHTML = '<div class="aw-loading"><span class="aw-spinner"></span> Searching...</div>';
+            var what = all ? ' all sources' : ' ' + (PROVIDER_NAMES[this.currentProvider] || '');
+            content.innerHTML = '<div class="aw-loading"><span class="aw-spinner"></span> Searching' + what + '...</div>';
 
             ApiClient.fetch({
-                url: ApiClient.getUrl('AniWorld/Search', { query: query }),
+                url: ApiClient.getUrl('AniWorld/Search', { query: query, source: all ? 'all' : this.currentProvider }),
                 type: 'GET',
                 dataType: 'json'
             }).then(function (results) {
                 AW.lastSearchResults = results;
                 AW.renderSearchResults(results);
             }).catch(function (err) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\u274C</div>Search failed: ' + esc(err.message || 'Unknown error') + '</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-xmark-circle"></i></div>Search failed: ' + esc(err.message || 'Unknown error') + '</div>';
             });
         },
 
@@ -284,7 +381,7 @@ export default function (view, params) {
         renderSearchResults: function (results) {
             var content = view.querySelector('#aw-content');
             if (!results || results.length === 0) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDD0D</div>No results found. Try different keywords.</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-search"></i></div>No results found. Try different keywords.</div>';
                 return;
             }
 
@@ -338,16 +435,7 @@ export default function (view, params) {
             var url = decodeURIComponent(encodedUrl);
             this.currentSeriesUrl = url;
             this.currentSeriesSource = source || 'aniworld';
-
-            // If called from browse tab, switch to search tab to show the detail view
-            var browseTab = view.querySelector('#browseTab');
-            if (browseTab && browseTab.style.display !== 'none') {
-                this.browseReturnTo = true;
-                view.querySelectorAll('.aw-tab').forEach(function (t) { t.classList.remove('active'); });
-                view.querySelector('[data-tab="search"]').classList.add('active');
-                view.querySelector('#searchTab').style.display = '';
-                view.querySelector('#browseTab').style.display = 'none';
-            }
+            this.viewMode = 'series';
 
             var content = view.querySelector('#aw-content');
             content.innerHTML = '<div class="aw-loading"><span class="aw-spinner"></span> Loading series info...</div>';
@@ -360,17 +448,17 @@ export default function (view, params) {
                 AW.currentSeriesTitle = series.Title || title || 'Unknown';
                 AW.renderSeries(series, url);
             }).catch(function (err) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\u274C</div>Failed to load series: ' + esc(err.message || 'Unknown error') + '</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-xmark-circle"></i></div>Failed to load series: ' + esc(err.message || 'Unknown error') + '</div>';
             });
         },
 
         renderSeries: function (series, seriesUrl) {
             var content = view.querySelector('#aw-content');
             var source = this.currentSeriesSource || 'aniworld';
-            var html = '<button class="aw-btn aw-btn-secondary aw-back" onclick="window.AW.goBack()">\u2190 Back to Results</button>';
+            var html = '<button class="aw-btn aw-btn-secondary aw-back" onclick="window.AW.goBack()"><i class="fa-solid fa-arrow-left"></i> Back</button>';
 
             if (source === 'sto' && series.Genres && series.Genres.some(function (g) { return g.toLowerCase() === 'anime'; })) {
-                html += '<div class="aw-warning">\u26A0\uFE0F For anime, using AniWorld as source is recommended.</div>';
+                html += '<div class="aw-warning"><i class="fa-solid fa-triangle-exclamation"></i> For anime, using AniWorld as source is recommended.</div>';
             }
 
             html += '<div class="aw-series">';
@@ -458,7 +546,7 @@ export default function (view, params) {
             var source = this.currentSeriesSource || 'aniworld';
 
             if (!episodes || episodes.length === 0) {
-                epContainer.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDCED</div>No episodes found.</div>';
+                epContainer.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-inbox"></i></div>No episodes found.</div>';
                 if (barContainer) barContainer.innerHTML = '';
                 return;
             }
@@ -476,9 +564,9 @@ export default function (view, params) {
                 bar += '<label class="aw-check" title="Redownload episodes even if they are already flagged as downloaded"><input type="checkbox" id="aw-force-cb"><span>Force</span></label>';
                 bar += '</div>';
                 bar += '<div class="aw-season-btns">';
-                bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')">\u2B07\uFE0F Download Season</button>';
+                bar += '<button class="aw-btn aw-btn-success aw-btn-sm" onclick="window.AW.downloadSeason(\'' + encodeURIComponent(seasonUrl) + '\')"><i class="fa-solid fa-download"></i> Download Season</button>';
                 if (AW.currentSeriesUrl) {
-                    bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')">\u2B07\uFE0F Download All Seasons</button>';
+                    bar += '<button class="aw-btn aw-btn-all-seasons aw-btn-sm" onclick="window.AW.downloadAllSeasons(\'' + encodeURIComponent(AW.currentSeriesUrl) + '\')"><i class="fa-solid fa-download"></i> Download All Seasons</button>';
                 }
                 bar += '</div>';
                 bar += '</div>';
@@ -508,7 +596,7 @@ export default function (view, params) {
                 html += '<span class="aw-ep-title" id="' + epId + '-title">Loading...</span>';
                 html += '<span class="aw-ep-downloaded" id="' + epId + '-dl" style="display:none"></span>';
                 html += '<div class="aw-ep-actions">';
-                html += '<button class="aw-btn aw-btn-primary aw-btn-sm" onclick="window.AW.downloadEpisode(\'' + encodeURIComponent(ep.Url) + '\')">\u2B07\uFE0F Download</button>';
+                html += '<button class="aw-btn aw-btn-primary aw-btn-sm" onclick="window.AW.downloadEpisode(\'' + encodeURIComponent(ep.Url) + '\')"><i class="fa-solid fa-download"></i> Download</button>';
                 html += '<button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.toggleProviders(\'' + encodeURIComponent(ep.Url) + '\', \'' + epId + '\')">Providers</button>';
                 html += '</div>';
                 html += '</div>';
@@ -564,7 +652,7 @@ export default function (view, params) {
                 if (result && result.downloaded && result.languages && result.languages.length > 0) {
                     var badge = view.querySelector('#' + epId + '-dl');
                     if (badge) {
-                        var html = '\u2713 ';
+                        var html = '<i class="fa-solid fa-check"></i>';
                         for (var i = 0; i < result.languages.length; i++) {
                             html += '<img src="' + ApiClient.getUrl('AniWorld/Flag/' + result.languages[i], { source: source }) + '" style="height:1.1em;vertical-align:middle;margin-right:0.2em">';
                         }
@@ -801,7 +889,7 @@ export default function (view, params) {
             AW.updateBadge(active);
 
             if (!downloads || downloads.length === 0) {
-                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDCED</div>No active downloads.<br>Search for anime and start downloading!</div>';
+                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-inbox"></i></div>No active downloads.<br>Search for anime and start downloading!</div>';
                 return;
             }
 
@@ -824,7 +912,7 @@ export default function (view, params) {
 
             var html = '';
             if (hasCompleted) {
-                html += '<div class="aw-dl-actions"><button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.clearCompleted()">\uD83E\uDDF9 Clear Completed</button></div>';
+                html += '<div class="aw-dl-actions"><button class="aw-btn aw-btn-secondary aw-btn-sm" onclick="window.AW.clearCompleted()"><i class="fa-solid fa-broom"></i> Clear Completed</button></div>';
             }
 
             html += '<div class="aw-dl">';
@@ -855,7 +943,7 @@ export default function (view, params) {
                     html += '<div class="aw-dl-error">' + esc(dl.Error) + '</div>';
                 }
                 if (dl.Status === 'Retrying' && dl.Error) {
-                    html += '<div class="aw-dl-retry-info">\u23F3 ' + esc(dl.Error) + '</div>';
+                    html += '<div class="aw-dl-retry-info"><i class="fa-solid fa-hourglass-half"></i> ' + esc(dl.Error) + '</div>';
                 }
                 if (dl.LanguageFallbackNote) {
                     html += '<div class="aw-dl-retry-info">' + esc(dl.LanguageFallbackNote) + '</div>';
@@ -868,10 +956,10 @@ export default function (view, params) {
 
                 html += '<div class="aw-dl-btns">';
                 if (isActive) {
-                    html += '<button class="aw-btn aw-btn-danger aw-btn-sm" onclick="window.AW.cancelDownload(\'' + dl.Id + '\')" title="Cancel">\u2715</button>';
+                    html += '<button class="aw-btn aw-btn-danger aw-btn-sm" onclick="window.AW.cancelDownload(\'' + dl.Id + '\')" title="Cancel"><i class="fa-solid fa-xmark"></i></button>';
                 }
                 if (isFailed) {
-                    html += '<button class="aw-btn aw-btn-warning aw-btn-sm" onclick="window.AW.retryDownload(\'' + dl.Id + '\')" title="Retry">\uD83D\uDD04</button>';
+                    html += '<button class="aw-btn aw-btn-warning aw-btn-sm" onclick="window.AW.retryDownload(\'' + dl.Id + '\')" title="Retry"><i class="fa-solid fa-rotate-right"></i></button>';
                 }
                 html += '</div>';
 
@@ -1021,7 +1109,7 @@ export default function (view, params) {
             if (!container) return;
 
             if ((!records || records.length === 0) && reset) {
-                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">\uD83D\uDCED</div>No download history yet.<br>Downloaded episodes will appear here.</div>';
+                container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-inbox"></i></div>No download history yet.<br>Downloaded episodes will appear here.</div>';
                 return;
             }
 
@@ -1075,16 +1163,12 @@ export default function (view, params) {
         goBack: function () {
             this.currentSeriesUrl = null;
             this.currentSeriesSource = null;
-            if (this.browseReturnTo) {
-                this.switchTab('browse');
-                this.browseReturnTo = null;
-            } else if (this.lastSearchResults) {
-                this.renderSearchResults(this.lastSearchResults);
-            } else if (this.lastSearchQuery) {
-                view.querySelector('#aw-search-input').value = this.lastSearchQuery;
-                this.search();
+            if (this.lastSearchContext) {
+                // Return to the last search results
+                this._runSearch(this.lastSearchContext.query, this.lastSearchContext.all);
             } else {
-                view.querySelector('#aw-content').innerHTML = '';
+                // Otherwise back to the selected provider's browse rows
+                this.showProviderBrowse(this.currentProvider);
             }
         }
     };
@@ -1092,7 +1176,7 @@ export default function (view, params) {
     // Expose globally for onclick handlers in dynamic HTML
     window.AW = AW;
 
-    // Load settings from server (language restrictions + maintenance mode)
+    // Load settings from server (enabled providers, language restrictions, maintenance mode)
     ApiClient.fetch({
         url: ApiClient.getUrl('AniWorld/EnabledSources'),
         type: 'GET',
@@ -1108,7 +1192,19 @@ export default function (view, params) {
                 banner.style.display = '';
             }
         }
-    }).catch(function () { /* ignore */ });
+
+        AW.enabledSources = {
+            aniworld: sources.aniworld !== false,
+            sto: sources.sto === true,
+            filmo: sources.filmo === true
+        };
+        AW.buildProviderControl();
+        AW.showCurrentView();
+    }).catch(function () {
+        // Without the settings the page should still work with the defaults (AniWorld only)
+        AW.buildProviderControl();
+        AW.showCurrentView();
+    });
 
     // Hide settings button when opened from sidebar (non-admin view)
     if (params && params.sidebar) {
@@ -1127,6 +1223,18 @@ export default function (view, params) {
                 AW.search();
             }
         });
+    }
+
+    // Keep both search buttons the same width (see _syncSearchBtnWidths).
+    AW._syncSearchBtnWidths();
+    var searchBar = view.querySelector('.aw-search-bar');
+    if (searchBar && typeof ResizeObserver !== 'undefined') {
+        // Observing the row (not the buttons): their min-width doesn't change the
+        // row's size, so this can't feed back into itself.
+        new ResizeObserver(function () { AW._syncSearchBtnWidths(); }).observe(searchBar);
+    }
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () { AW._syncSearchBtnWidths(); });
     }
 
     // Poll badge count periodically
