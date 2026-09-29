@@ -25,15 +25,26 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
         serviceCollection.AddHttpClient("Filmo", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
             .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
+        serviceCollection.AddHttpClient("FilmPalast", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
+        serviceCollection.AddHttpClient("MegaKino", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
+        serviceCollection.AddHttpClient("Moflix", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
         serviceCollection.AddSingleton<AniWorldService>();
         serviceCollection.AddSingleton<StoService>();
         serviceCollection.AddSingleton<FilmoService>();
+        serviceCollection.AddSingleton<FilmPalastService>();
+        serviceCollection.AddSingleton<MegaKinoService>();
+        serviceCollection.AddSingleton<MoflixService>();
         serviceCollection.AddSingleton<DownloadHistoryService>();
         serviceCollection.AddSingleton<DownloadService>();
         serviceCollection.AddSingleton<IStreamExtractor, VoeExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, VidozaExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, VidmolyExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, FilemoonExtractor>();
+        serviceCollection.AddSingleton<IStreamExtractor, MegaKinoExtractor>();
+        serviceCollection.AddSingleton<IStreamExtractor, MoflixClickExtractor>();
     }
 
     private static HttpMessageHandler ConfigureHandler(IServiceProvider _)

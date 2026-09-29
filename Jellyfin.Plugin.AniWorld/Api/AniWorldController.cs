@@ -30,6 +30,9 @@ public class AniWorldController : ControllerBase
     private readonly AniWorldService _aniWorldService;
     private readonly StoService _stoService;
     private readonly FilmoService _filmoService;
+    private readonly FilmPalastService _filmPalastService;
+    private readonly MegaKinoService _megaKinoService;
+    private readonly MoflixService _moflixService;
     private readonly DownloadService _downloadService;
     private readonly DownloadHistoryService _historyService;
     private readonly IServerConfigurationManager _configManager;
@@ -42,6 +45,9 @@ public class AniWorldController : ControllerBase
         AniWorldService aniWorldService,
         StoService stoService,
         FilmoService filmoService,
+        FilmPalastService filmPalastService,
+        MegaKinoService megaKinoService,
+        MoflixService moflixService,
         DownloadService downloadService,
         DownloadHistoryService historyService,
         IServerConfigurationManager configManager,
@@ -50,6 +56,9 @@ public class AniWorldController : ControllerBase
         _aniWorldService = aniWorldService;
         _stoService = stoService;
         _filmoService = filmoService;
+        _filmPalastService = filmPalastService;
+        _megaKinoService = megaKinoService;
+        _moflixService = moflixService;
         _downloadService = downloadService;
         _historyService = historyService;
         _configManager = configManager;
@@ -69,6 +78,21 @@ public class AniWorldController : ControllerBase
         if (string.Equals(source, "filmo", StringComparison.OrdinalIgnoreCase))
         {
             return _filmoService;
+        }
+
+        if (string.Equals(source, "filmpalast", StringComparison.OrdinalIgnoreCase))
+        {
+            return _filmPalastService;
+        }
+
+        if (string.Equals(source, "megakino", StringComparison.OrdinalIgnoreCase))
+        {
+            return _megaKinoService;
+        }
+
+        if (string.Equals(source, "moflix", StringComparison.OrdinalIgnoreCase))
+        {
+            return _moflixService;
         }
 
         return _aniWorldService;
@@ -158,6 +182,9 @@ public class AniWorldController : ControllerBase
             aniworld = config?.AniWorldConfig.Enabled ?? true,
             sto = config?.StoConfig.Enabled ?? false,
             filmo = config?.FilmoConfig.Enabled ?? false,
+            filmpalast = config?.FilmPalastConfig.Enabled ?? false,
+            megakino = config?.MegaKinoConfig.Enabled ?? false,
+            moflix = config?.MoflixConfig.Enabled ?? false,
             aniWorldOnlyGerman = config?.AniWorldConfig.OnlyGermanLanguages ?? false,
             maintenanceMode = config?.MaintenanceMode ?? false,
             maintenanceMessage = config?.MaintenanceMessage ?? string.Empty
@@ -221,6 +248,45 @@ public class AniWorldController : ControllerBase
                 }
             }
 
+            if (config?.FilmPalastConfig.Enabled == true)
+            {
+                try
+                {
+                    var filmPalastResults = await _filmPalastService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+                    results.AddRange(filmPalastResults);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "FilmPalast search failed for query: {Query}", query);
+                }
+            }
+
+            if (config?.MegaKinoConfig.Enabled == true)
+            {
+                try
+                {
+                    var megaKinoResults = await _megaKinoService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+                    results.AddRange(megaKinoResults);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "MegaKino search failed for query: {Query}", query);
+                }
+            }
+
+            if (config?.MoflixConfig.Enabled == true)
+            {
+                try
+                {
+                    var moflixResults = await _moflixService.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+                    results.AddRange(moflixResults);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Moflix search failed for query: {Query}", query);
+                }
+            }
+
             return Ok(results);
         }
 
@@ -242,7 +308,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, https://filmo.to, https://filmpalast.to, https://moflix-stream.xyz and MegaKino URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
@@ -264,7 +330,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, https://filmo.to, https://filmpalast.to, https://moflix-stream.xyz and MegaKino URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
@@ -286,7 +352,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, https://filmo.to, https://filmpalast.to, https://moflix-stream.xyz and MegaKino URLs are accepted.");
         }
 
         var resolvedSource = ResolveSource(source, url);
@@ -352,7 +418,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.EpisodeUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, https://filmo.to, https://filmpalast.to, https://moflix-stream.xyz and MegaKino URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.EpisodeUrl);
@@ -437,7 +503,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.SeasonUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, https://filmo.to, https://filmpalast.to, https://moflix-stream.xyz and MegaKino URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.SeasonUrl);
@@ -549,7 +615,7 @@ public class AniWorldController : ControllerBase
 
         if (!UrlValidator.IsValidUrl(request.SeriesUrl))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, https://filmo.to, https://filmpalast.to, https://moflix-stream.xyz and MegaKino URLs are accepted.");
         }
 
         var source = ResolveSource(request.Source, request.SeriesUrl);
@@ -795,7 +861,7 @@ public class AniWorldController : ControllerBase
     {
         if (!UrlValidator.IsValidUrl(url))
         {
-            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to and https://filmo.to URLs are accepted.");
+            return BadRequest("Invalid URL. Only https://aniworld.to, https://s.to, https://filmo.to, https://filmpalast.to, https://moflix-stream.xyz and MegaKino URLs are accepted.");
         }
 
         var (season, episode) = PathHelper.ParseSeasonEpisode(url);
@@ -815,7 +881,10 @@ public class AniWorldController : ControllerBase
     public ActionResult GetFlag(string lang, string? source = null)
     {
         var isDub = string.Equals(source, "sto", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(source, "filmo", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(source, "filmo", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(source, "filmpalast", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(source, "megakino", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(source, "moflix", StringComparison.OrdinalIgnoreCase);
 
         string? resourceName = lang switch
         {
@@ -855,6 +924,9 @@ public class AniWorldController : ControllerBase
             "aniworld" => "Jellyfin.Plugin.AniWorld.Web.aniworld.svg",
             "sto" => "Jellyfin.Plugin.AniWorld.Web.sto.svg",
             "filmo" => "Jellyfin.Plugin.AniWorld.Web.filmo.svg",
+            "filmpalast" => "Jellyfin.Plugin.AniWorld.Web.filmpalast.svg",
+            "megakino" => "Jellyfin.Plugin.AniWorld.Web.megakino.svg",
+            "moflix" => "Jellyfin.Plugin.AniWorld.Web.moflix.svg",
             _ => null
         };
 

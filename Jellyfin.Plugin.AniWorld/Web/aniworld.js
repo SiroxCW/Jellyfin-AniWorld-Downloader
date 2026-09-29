@@ -52,9 +52,15 @@ export default function (view, params) {
         }
     }
 
+    // Sources that carry a full English DUB (not just subtitles).
+    function isDubSource(source) {
+        return source === 'sto' || source === 'filmo' || source === 'filmpalast'
+            || source === 'megakino' || source === 'moflix';
+    }
+
     // Language names per source (plain text)
     function getLangNames(source) {
-        if (source === 'sto' || source === 'filmo') {
+        if (isDubSource(source)) {
             return { '1': 'German Dub', '2': 'English Dub' };
         }
         return { '1': 'German Dub', '2': 'English Sub', '3': 'German Sub' };
@@ -72,7 +78,7 @@ export default function (view, params) {
     function getLangOptionsHtml(source) {
         var html = '<option value="">\uD83C\uDF10 Use Settings Default</option>';
         html += '<option value="1">\uD83C\uDDE9\uD83C\uDDEA German Dub</option>';
-        if (source === 'sto' || source === 'filmo') {
+        if (isDubSource(source)) {
             html += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Dub</option>';
         } else {
             html += '<option value="2">\uD83C\uDDEC\uD83C\uDDE7 English Sub</option>';
@@ -190,11 +196,56 @@ export default function (view, params) {
                 return [];
             }).catch(function () { return []; }));
 
+            // Load from FilmPalast if enabled (uses EnabledSources endpoint)
+            promises.push(ApiClient.fetch({
+                url: ApiClient.getUrl('AniWorld/EnabledSources'),
+                type: 'GET', dataType: 'json'
+            }).then(function (sources) {
+                if (sources.filmpalast) {
+                    return ApiClient.fetch({
+                        url: ApiClient.getUrl(endpoint, { source: 'filmpalast' }),
+                        type: 'GET', dataType: 'json'
+                    }).catch(function () { return []; });
+                }
+                return [];
+            }).catch(function () { return []; }));
+
+            // Load from MegaKino if enabled (uses EnabledSources endpoint)
+            promises.push(ApiClient.fetch({
+                url: ApiClient.getUrl('AniWorld/EnabledSources'),
+                type: 'GET', dataType: 'json'
+            }).then(function (sources) {
+                if (sources.megakino) {
+                    return ApiClient.fetch({
+                        url: ApiClient.getUrl(endpoint, { source: 'megakino' }),
+                        type: 'GET', dataType: 'json'
+                    }).catch(function () { return []; });
+                }
+                return [];
+            }).catch(function () { return []; }));
+
+            // Load from Moflix if enabled (uses EnabledSources endpoint)
+            promises.push(ApiClient.fetch({
+                url: ApiClient.getUrl('AniWorld/EnabledSources'),
+                type: 'GET', dataType: 'json'
+            }).then(function (sources) {
+                if (sources.moflix) {
+                    return ApiClient.fetch({
+                        url: ApiClient.getUrl(endpoint, { source: 'moflix' }),
+                        type: 'GET', dataType: 'json'
+                    }).catch(function () { return []; });
+                }
+                return [];
+            }).catch(function () { return []; }));
+
             Promise.all(promises).then(function (results) {
                 AW.browseLoaded[section] = true;
                 AW['browseCache_aniworld_' + section] = results[0] || [];
                 AW['browseCache_sto_' + section] = results[1] || [];
                 AW['browseCache_filmo_' + section] = results[2] || [];
+                AW['browseCache_filmpalast_' + section] = results[3] || [];
+                AW['browseCache_megakino_' + section] = results[4] || [];
+                AW['browseCache_moflix_' + section] = results[5] || [];
                 AW._renderBrowseCombined(section, container);
             }).catch(function (err) {
                 container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">❌</div>Failed to load: ' + esc(err.message || 'Unknown error') + '</div>';
@@ -205,9 +256,13 @@ export default function (view, params) {
             var awItems = this['browseCache_aniworld_' + section] || [];
             var stoItems = this['browseCache_sto_' + section] || [];
             var filmoItems = this['browseCache_filmo_' + section] || [];
+            var filmPalastItems = this['browseCache_filmpalast_' + section] || [];
+            var megaKinoItems = this['browseCache_megakino_' + section] || [];
+            var moflixItems = this['browseCache_moflix_' + section] || [];
             var html = '';
 
-            if (awItems.length === 0 && stoItems.length === 0 && filmoItems.length === 0) {
+            if (awItems.length === 0 && stoItems.length === 0 && filmoItems.length === 0
+                && filmPalastItems.length === 0 && megaKinoItems.length === 0 && moflixItems.length === 0) {
                 container.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon">📭</div>No content found.</div>';
                 return;
             }
@@ -225,6 +280,21 @@ export default function (view, params) {
             if (filmoItems.length > 0) {
                 html += '<div class="aw-browse-section-title">filmo.to</div>';
                 html += this._buildBrowseGrid(filmoItems, 'filmo');
+            }
+
+            if (filmPalastItems.length > 0) {
+                html += '<div class="aw-browse-section-title">FilmPalast</div>';
+                html += this._buildBrowseGrid(filmPalastItems, 'filmpalast');
+            }
+
+            if (megaKinoItems.length > 0) {
+                html += '<div class="aw-browse-section-title">MegaKino</div>';
+                html += this._buildBrowseGrid(megaKinoItems, 'megakino');
+            }
+
+            if (moflixItems.length > 0) {
+                html += '<div class="aw-browse-section-title">Moflix</div>';
+                html += this._buildBrowseGrid(moflixItems, 'moflix');
             }
 
             container.innerHTML = html;

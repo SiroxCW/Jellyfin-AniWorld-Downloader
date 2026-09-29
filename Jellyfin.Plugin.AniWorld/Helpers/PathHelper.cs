@@ -34,6 +34,44 @@ public static class PathHelper
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
+    /// Regex to match a filmpalast.to movie URL (/stream/{slug}).
+    /// </summary>
+    public static readonly Regex FilmpalastMovieFromUrl = new(
+        @"filmpalast\.to/stream/[\w-]+",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Regex to match a MegaKino movie URL (/films/{slug}) on its rotating domain.
+    /// </summary>
+    public static readonly Regex MegaKinoMovieFromUrl = new(
+        @"megakino\d*\.com/films/[\w-]+",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Regex to extract the episode number from a MegaKino serial URL fragment
+    /// (serial page + #mkep={N}); MegaKino serials are always season 1.
+    /// </summary>
+    public static readonly Regex MegaKinoEpisodeFromUrl = new(
+        @"#mkep=(?<episode>\d+)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Regex to extract season and episode numbers from a moflix-stream.xyz
+    /// series URL (/titles/{id}/season/{s}/episodes/{e}).
+    /// </summary>
+    public static readonly Regex MoflixEpisodeFromUrl = new(
+        @"moflix-stream\.xyz/titles/\d+/season/(?<season>\d+)/episodes/(?<episode>\d+)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Regex to match a moflix-stream.xyz movie URL (/titles/{id} with no
+    /// trailing /season).
+    /// </summary>
+    public static readonly Regex MoflixMovieFromUrl = new(
+        @"moflix-stream\.xyz/titles/\d+(?!/season)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
     /// Regex to extract the series slug from a URL.
     /// Supports /anime/stream/{slug} (aniworld), /serie/{slug} (s.to) and /movies/{slug} (filmo.to).
     /// </summary>
@@ -46,7 +84,11 @@ public static class PathHelper
     /// </summary>
     public static bool IsMovieUrl(string url)
     {
-        return MovieFromUrl.IsMatch(url) || FilmoMovieFromUrl.IsMatch(url);
+        return MovieFromUrl.IsMatch(url)
+            || FilmoMovieFromUrl.IsMatch(url)
+            || FilmpalastMovieFromUrl.IsMatch(url)
+            || MegaKinoMovieFromUrl.IsMatch(url)
+            || MoflixMovieFromUrl.IsMatch(url);
     }
 
     /// <summary>
@@ -87,6 +129,18 @@ public static class PathHelper
             return (int.Parse(seMatch.Groups["season"].Value), int.Parse(seMatch.Groups["episode"].Value));
         }
 
+        var moflixMatch = MoflixEpisodeFromUrl.Match(url);
+        if (moflixMatch.Success)
+        {
+            return (int.Parse(moflixMatch.Groups["season"].Value), int.Parse(moflixMatch.Groups["episode"].Value));
+        }
+
+        var megaKinoMatch = MegaKinoEpisodeFromUrl.Match(url);
+        if (megaKinoMatch.Success)
+        {
+            return (1, int.Parse(megaKinoMatch.Groups["episode"].Value));
+        }
+
         var movieMatch = MovieFromUrl.Match(url);
         if (movieMatch.Success)
         {
@@ -124,9 +178,35 @@ public static class PathHelper
             return Path.Combine(basePath, safeName, "Specials", fileName);
         }
 
-        // filmo.to movies: same layout as aniworld movies so the rebuild
-        // task can parse them back (Specials + S00E00)
-        if (FilmoMovieFromUrl.IsMatch(episodeUrl))
+        // moflix series episodes: /titles/{id}/season/{s}/episodes/{e}
+        var moflixMatch = MoflixEpisodeFromUrl.Match(episodeUrl);
+        if (moflixMatch.Success)
+        {
+            var season = int.Parse(moflixMatch.Groups["season"].Value);
+            var episode = int.Parse(moflixMatch.Groups["episode"].Value);
+            var seasonFolder = $"Season {season:D2}";
+            var fileName = $"{safeName} - S{season:D2}E{episode:D2}.mkv";
+
+            return Path.Combine(basePath, safeName, seasonFolder, fileName);
+        }
+
+        // MegaKino serial episodes: {serial url}#mkep={n} (always season 1)
+        var megaKinoMatch = MegaKinoEpisodeFromUrl.Match(episodeUrl);
+        if (megaKinoMatch.Success)
+        {
+            var episode = int.Parse(megaKinoMatch.Groups["episode"].Value);
+            var fileName = $"{safeName} - S01E{episode:D2}.mkv";
+
+            return Path.Combine(basePath, safeName, "Season 01", fileName);
+        }
+
+        // Movies on filmo.to / filmpalast.to / megakino / moflix: same layout
+        // as aniworld movies so the rebuild task can parse them back
+        // (Specials + S00E00).
+        if (FilmoMovieFromUrl.IsMatch(episodeUrl)
+            || FilmpalastMovieFromUrl.IsMatch(episodeUrl)
+            || MegaKinoMovieFromUrl.IsMatch(episodeUrl)
+            || MoflixMovieFromUrl.IsMatch(episodeUrl))
         {
             var fileName = $"{safeName} - S00E00.mkv";
 
