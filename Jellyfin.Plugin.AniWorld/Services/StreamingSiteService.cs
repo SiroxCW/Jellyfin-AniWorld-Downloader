@@ -121,10 +121,30 @@ public abstract class StreamingSiteService
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        var results = JsonSerializer.Deserialize<List<SearchResultRaw>>(json, new JsonSerializerOptions
+
+        // The site answers an empty body (HTTP 200, 0 bytes) for terms with no
+        // match; a non-JSON body means the search page changed. Both are
+        // reported as "no results" instead of an error, so the UI shows
+        // "No results found." rather than "Search failed: Unknown error".
+        if (string.IsNullOrWhiteSpace(json) || !json.TrimStart().StartsWith("["))
         {
-            PropertyNameCaseInsensitive = true
-        });
+            Logger.LogDebug("{Source} search for {Keyword} returned no usable JSON", SourceName, keyword);
+            return new List<SearchResult>();
+        }
+
+        List<SearchResultRaw>? results;
+        try
+        {
+            results = JsonSerializer.Deserialize<List<SearchResultRaw>>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch (JsonException ex)
+        {
+            Logger.LogDebug(ex, "{Source} search for {Keyword} returned invalid JSON", SourceName, keyword);
+            return new List<SearchResult>();
+        }
 
         if (results == null)
         {

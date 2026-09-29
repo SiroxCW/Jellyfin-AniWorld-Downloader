@@ -2,10 +2,12 @@ using System;
 using System.Net;
 using System.Net.Http;
 using Jellyfin.Plugin.AniWorld.Extractors;
+using Jellyfin.Plugin.AniWorld.Helpers;
 using Jellyfin.Plugin.AniWorld.Services;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AniWorld;
 
@@ -29,8 +31,12 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
         serviceCollection.AddHttpClient("MegaKino", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
             .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
+        // Moflix's JSON API sits behind Cloudflare and fingerprints non-browser TLS
+        // clients, so it is served through curl-impersonate (a real Chrome
+        // fingerprint) when the native library is available; otherwise it falls
+        // back to the regular handler like the other providers.
         serviceCollection.AddHttpClient("Moflix", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
-            .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
+            .ConfigurePrimaryHttpMessageHandler(ConfigureMoflixHandler);
         serviceCollection.AddSingleton<AniWorldService>();
         serviceCollection.AddSingleton<StoService>();
         serviceCollection.AddSingleton<FilmoService>();
@@ -45,6 +51,19 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IStreamExtractor, FilemoonExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, MegaKinoExtractor>();
         serviceCollection.AddSingleton<IStreamExtractor, MoflixClickExtractor>();
+    }
+
+    private static HttpMessageHandler ConfigureMoflixHandler(IServiceProvider services)
+    {
+        var proxyUrl = Plugin.Instance?.Configuration?.ProxyUrl;
+        var logger = services.GetService<ILogger<CurlImpersonateHandler>>();
+        var impersonate = CurlImpersonateHandler.TryCreate(proxyUrl, logger);
+        if (impersonate != null)
+        {
+            return impersonate;
+        }
+
+        return ConfigureHandler(services);
     }
 
     private static HttpMessageHandler ConfigureHandler(IServiceProvider _)

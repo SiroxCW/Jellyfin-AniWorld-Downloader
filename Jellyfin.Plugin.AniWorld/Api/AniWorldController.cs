@@ -919,29 +919,29 @@ public class AniWorldController : ControllerBase
     [AllowAnonymous]
     public ActionResult GetSiteLogo(string source)
     {
-        var resourceName = source.ToLowerInvariant() switch
+        (string? ResourceName, string? Mime) logo = source.ToLowerInvariant() switch
         {
-            "aniworld" => "Jellyfin.Plugin.AniWorld.Web.aniworld.svg",
-            "sto" => "Jellyfin.Plugin.AniWorld.Web.sto.svg",
-            "filmo" => "Jellyfin.Plugin.AniWorld.Web.filmo.svg",
-            "filmpalast" => "Jellyfin.Plugin.AniWorld.Web.filmpalast.svg",
-            "megakino" => "Jellyfin.Plugin.AniWorld.Web.megakino.svg",
-            "moflix" => "Jellyfin.Plugin.AniWorld.Web.moflix.svg",
-            _ => null
+            "aniworld" => ("Jellyfin.Plugin.AniWorld.Web.aniworld.svg", "image/svg+xml"),
+            "sto" => ("Jellyfin.Plugin.AniWorld.Web.sto.svg", "image/svg+xml"),
+            "filmo" => ("Jellyfin.Plugin.AniWorld.Web.filmo.svg", "image/svg+xml"),
+            "filmpalast" => ("Jellyfin.Plugin.AniWorld.Web.filmpalast.png", "image/png"),
+            "megakino" => ("Jellyfin.Plugin.AniWorld.Web.megakino.svg", "image/svg+xml"),
+            "moflix" => ("Jellyfin.Plugin.AniWorld.Web.moflix.png", "image/png"),
+            _ => (null, null)
         };
 
-        if (resourceName == null)
+        if (logo.ResourceName == null)
         {
             return NotFound();
         }
 
-        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
+        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(logo.ResourceName);
         if (stream == null)
         {
             return NotFound();
         }
 
-        return File(stream, "image/svg+xml");
+        return File(stream, logo.Mime!);
     }
 
     /// <summary>

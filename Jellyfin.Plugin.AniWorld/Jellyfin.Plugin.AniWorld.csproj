@@ -31,4 +31,14 @@
     <EmbeddedResource Include="Web\**\*" />
   </ItemGroup>
 
+  <!-- curl-impersonate native libraries (browser TLS/HTTP2 fingerprint) for
+       Linux x64/arm64. Copied next to the plugin assembly so the handler can
+       load them at runtime. Not embedded, to keep the DLL small. -->
+  <ItemGroup>
+    <None Include="native\**\*.so">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>native\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
 </Project>

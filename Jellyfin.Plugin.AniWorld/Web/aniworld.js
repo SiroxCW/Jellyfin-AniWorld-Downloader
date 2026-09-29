@@ -17,6 +17,15 @@ export default function (view, params) {
         return d.innerHTML;
     }
 
+    // Human-readable message for a rejected ApiClient promise: Jellyfin's ApiClient
+    // rejects with an error that often has no message but does carry the HTTP status.
+    function errMsg(err) {
+        if (!err) return 'Unknown error';
+        if (err.message && err.message !== 'Unknown error') return err.message;
+        if (err.status) return 'server error ' + err.status;
+        return 'the site could not be reached';
+    }
+
     // Escape a string for safe inclusion inside a JS single-quoted string in an HTML attribute.
     // Prevents XSS via crafted provider names or titles breaking out of onclick="...fn('HERE')".
     function escJs(str) {
@@ -100,6 +109,12 @@ export default function (view, params) {
     // Get site logo URL
     function siteLogoUrl(source) {
         return ApiClient.getUrl('AniWorld/SiteLogo/' + (source || 'aniworld'));
+    }
+
+    // CSS classes for the source badge: base class + a per-source pill background
+    // (see .aw-badge-* rules in aniworld.html).
+    function badgeClass(source) {
+        return 'aw-browse-source-badge aw-badge-' + (source || 'aniworld');
     }
 
     // Display names for the providers, used in the selector, placeholders and loading hints
@@ -326,7 +341,7 @@ export default function (view, params) {
                 var itemSource = item.Source || source || 'aniworld';
                 html += '<div class="aw-browse-card" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\', \'' + escJs(itemSource) + '\')">';
                 html += '<img class="aw-browse-cover" src="' + esc(item.CoverImageUrl) + '" alt="' + esc(item.Title) + '" loading="lazy" onerror="this.style.display=\'none\'" />';
-                var badgeCls = 'aw-browse-source-badge' + (itemSource === 'aniworld' ? ' aw-badge-aniworld' : '');
+                var badgeCls = badgeClass(itemSource);
                 html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(itemSource) + '" onerror="this.style.display=\'none\'" />';
                 html += '<div class="aw-browse-info">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
@@ -388,7 +403,7 @@ export default function (view, params) {
                 AW.lastSearchResults = results;
                 AW.renderSearchResults(results);
             }).catch(function (err) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-xmark-circle"></i></div>Search failed: ' + esc(err.message || 'Unknown error') + '</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-xmark-circle"></i></div>Search failed: ' + esc(errMsg(err)) + '</div>';
             });
         },
 
@@ -410,7 +425,7 @@ export default function (view, params) {
                 var cardId = 'aw-sr-' + idx;
                 html += '<div class="aw-browse-card" id="' + cardId + '" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\', \'' + escJs(source) + '\')">';
                 html += '<div class="aw-browse-cover aw-cover-placeholder" id="' + cardId + '-cover"></div>';
-                var badgeCls = 'aw-browse-source-badge' + (source === 'aniworld' ? ' aw-badge-aniworld' : '');
+                var badgeCls = badgeClass(source);
                 html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" />';
                 html += '<div class="aw-browse-info aw-browse-info-solo">';
                 html += '<h3>' + esc(item.Title) + '</h3>';
@@ -464,7 +479,7 @@ export default function (view, params) {
                 AW.currentSeriesTitle = series.Title || title || 'Unknown';
                 AW.renderSeries(series, url);
             }).catch(function (err) {
-                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-xmark-circle"></i></div>Failed to load series: ' + esc(err.message || 'Unknown error') + '</div>';
+                content.innerHTML = '<div class="aw-empty"><div class="aw-empty-icon"><i class="fa-solid fa-xmark-circle"></i></div>Failed to load series: ' + esc(errMsg(err)) + '</div>';
             });
         },
 
@@ -871,7 +886,7 @@ export default function (view, params) {
                     Dashboard.alert(prefix + ': HTTP ' + (err.status || 'error'));
                 });
             } else {
-                Dashboard.alert(prefix + ': ' + (err.message || 'Unknown error'));
+                Dashboard.alert(prefix + ': ' + errMsg(err));
             }
         },
 
@@ -1003,7 +1018,7 @@ export default function (view, params) {
                 Dashboard.alert('Retrying download...');
                 AW.loadDownloads();
             }).catch(function (err) {
-                Dashboard.alert('Retry failed: ' + (err.message || 'Unknown error'));
+                Dashboard.alert('Retry failed: ' + errMsg(err));
             });
         },
 

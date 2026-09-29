@@ -167,8 +167,15 @@
         /* Search results carry no genre line, so the title block would sit squat.
            The extra padding makes it match the height of a Browse card's title + genre. */
         .aw-browse-info-solo { padding-block: 1.35em; }
-        .aw-browse-source-badge { position: absolute; top: 0.4em; right: 0.4em; height: 1.4em; border-radius: 4px; padding: 0.15em 0.3em; }
-        .aw-browse-source-badge.aw-badge-aniworld { background: rgba(0,0,0,0.5); border-radius: 999px; }
+        /* Source badges show the real provider logo. The logos are transparent, so each
+           badge sits on a rounded pill. Light logos (Filmo, MegaKino, Moflix) read on a
+           dark pill; the red Filmpalast logo reads on a light pill. */
+        .aw-browse-source-badge { position: absolute; top: 0.4em; right: 0.4em; height: 1.4em; border-radius: 999px; padding: 0.15em 0.4em; }
+        .aw-browse-source-badge.aw-badge-aniworld,
+        .aw-browse-source-badge.aw-badge-filmo,
+        .aw-browse-source-badge.aw-badge-megakino,
+        .aw-browse-source-badge.aw-badge-moflix { background: rgba(0,0,0,0.55); }
+        .aw-browse-source-badge.aw-badge-filmpalast { background: rgba(255,255,255,0.85); }
 
         /* Browse section heading */
         .aw-browse-section-title { font-size: 1.1em; font-weight: 600; margin: 1.2em 0 0.8em; }
