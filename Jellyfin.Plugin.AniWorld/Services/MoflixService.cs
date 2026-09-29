@@ -247,7 +247,21 @@ public class MoflixService : StreamingSiteService
         {
             foreach (var item in g.EnumerateArray())
             {
-                var genre = item.ValueKind == JsonValueKind.String ? item.GetString() : item.ToString();
+                string? genre;
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    genre = item.GetString();
+                }
+                else if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("name", out var nameEl))
+                {
+                    // The API returns genres as objects like {"id":1,"name":"Drama"}.
+                    genre = nameEl.ValueKind == JsonValueKind.String ? nameEl.GetString() : nameEl.ToString();
+                }
+                else
+                {
+                    genre = item.ToString();
+                }
+
                 if (!string.IsNullOrWhiteSpace(genre) && !genres.Contains(genre, StringComparer.OrdinalIgnoreCase))
                 {
                     genres.Add(genre!);
