@@ -28,7 +28,11 @@ jobs:
           mkdir -p release
           cp Jellyfin.Plugin.AniWorld/bin/Release/net9.0/Jellyfin.Plugin.AniWorld.dll release/
           cp Jellyfin.Plugin.AniWorld/meta.json release/
-          cd release && zip ../jellyfin-aniworld-downloader-${{ github.event.release.tag_name }}.zip *
+          # curl-impersonate native libs, needed by the Moflix source for its
+          # Cloudflare-protected API (loaded from <pluginDir>/native/ at runtime).
+          # Without them Moflix falls back to the plain client and breaks.
+          cp -r Jellyfin.Plugin.AniWorld/bin/Release/net9.0/native release/
+          cd release && zip -r ../jellyfin-aniworld-downloader-${{ github.event.release.tag_name }}.zip *
 
       - name: Compute checksum
         id: checksum
