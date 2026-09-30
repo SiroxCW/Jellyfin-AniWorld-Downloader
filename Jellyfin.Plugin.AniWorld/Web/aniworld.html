@@ -175,7 +175,9 @@
         .aw-browse-source-badge.aw-badge-filmo,
         .aw-browse-source-badge.aw-badge-megakino,
         .aw-browse-source-badge.aw-badge-moflix { background: rgba(0,0,0,0.55); }
-        .aw-browse-source-badge.aw-badge-filmpalast { background: rgba(255,255,255,0.85); }
+        /* Filmpalast: the mark reads a touch large, so the whole badge is ~5%
+           smaller (height 1.4em → 1.33em); the light pill background stays. */
+        .aw-browse-source-badge.aw-badge-filmpalast { background: rgba(255,255,255,0.85); height: 1.33em; }
         /* Filmo: the mark reads a bit large, so only the image inside the badge is
            smaller — extra vertical padding shrinks it while the pill keeps its size
            (the page's global box-sizing: border-box makes padding eat into the 1.4em). */
