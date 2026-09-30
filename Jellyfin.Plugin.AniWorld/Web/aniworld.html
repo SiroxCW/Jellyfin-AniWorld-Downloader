@@ -176,6 +176,12 @@
         .aw-browse-source-badge.aw-badge-megakino,
         .aw-browse-source-badge.aw-badge-moflix { background: rgba(0,0,0,0.55); }
         .aw-browse-source-badge.aw-badge-filmpalast { background: rgba(255,255,255,0.85); }
+        /* Filmo: the mark reads a bit large, so only the image inside the badge is
+           smaller — extra vertical padding shrinks it while the pill keeps its size
+           (the page's global box-sizing: border-box makes padding eat into the 1.4em). */
+        .aw-browse-source-badge.aw-badge-filmo { padding: 0.25em 0.55em; }
+        /* Moflix: the mark is wide, so scale the whole badge down a bit. */
+        .aw-browse-source-badge.aw-badge-moflix { height: 1.2em; padding: 0.12em 0.35em; }
 
         /* Browse section heading */
         .aw-browse-section-title { font-size: 1.1em; font-weight: 600; margin: 1.2em 0 0.8em; }
