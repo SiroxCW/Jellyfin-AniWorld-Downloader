@@ -5,9 +5,9 @@
 
 A Jellyfin plugin for searching and downloading anime and series from [aniworld.to](https://aniworld.to), [s.to](https://s.to), [filmo.to](https://filmo.to), [FilmPalast](https://filmpalast.to), [MegaKino](https://megakino.com) and [Moflix](https://moflix-stream.xyz), directly inside Jellyfin's web interface.
 
-Series View| Search View
+Title View| Search View
 :---:|:---:
-![Series View](screenshots/preview_anime.png) | ![Search View](screenshots/preview_search.png)
+![Title View](screenshots/preview_anime.png) | ![Search View](screenshots/preview_search.png)
 
 ## Features
 
