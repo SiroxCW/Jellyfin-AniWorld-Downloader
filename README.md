@@ -1,5 +1,7 @@
 # Jellyfin AniWorld Downloader
 
+![Jellyfin AniWorld Downloader banner](screenshots/jellyfin-aniworld-banner.png)
+
 ![GitHub Release](https://img.shields.io/github/v/release/SiroxCW/Jellyfin-AniWorld-Downloader)
 ![GitHub License](https://img.shields.io/github/license/SiroxCW/Jellyfin-AniWorld-Downloader)
 
