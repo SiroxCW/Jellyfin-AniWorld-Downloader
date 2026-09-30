@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.7.0.0",
+        "changelog": "v1.7.0.0\n- Feature: New movie sources \u2014 Filmo (filmo.to), FilmPalast, MegaKino and Moflix\n- Feature: UI rework \u2014 single Browse tab with provider switching (AniWorld, SerienStream, Filmo, FilmPalast, MegaKino, Moflix) and a \"Search All\" that queries every source at once\n- Feature: Tabbed settings page \u2014 one tab per site plus a General tab\n- UI: Mobile-optimized layout; emoji replaced with bundled Font Awesome icons (no CDN, works offline)\n- Change: Default s.to base URL is now https://serienstream.to (still changeable in settings)\n- Fix: Search and Search All buttons now always the same width",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.7.0.0/jellyfin-aniworld-downloader-v1.7.0.0.zip",
+        "checksum": "76f9c9dfb9665696c4b49ef7d599dfda",
+        "timestamp": "2026-09-30T12:11:42Z"
+      },
+      {
         "version": "1.6.1.0",
         "changelog": "v1.6.1.0\n- Added language fallback. Thanks to Alexius25 on GitHub\n- Removed remaining dead HiAnime code\n- Removed: FlareSolverr integration. s.to has moved its provider redirector behind a Cloudflare Turnstile widget that activates per-IP for flagged egress addresses. FlareSolverr cannot solve embedded Turnstile widgets that require user interaction, so the integration was not actually helping affected users. If your server's IP is gated, route the plugin's outbound traffic through a clean proxy via the existing Proxy Server setting (SOCKS5 / HTTP supported).",
         "targetAbi": "10.11.0.0",
