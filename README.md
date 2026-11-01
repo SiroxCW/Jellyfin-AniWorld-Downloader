@@ -21,7 +21,7 @@ Title View| Search View
 - **Download manager** with real-time progress, cancel, retry, and batch operations
 - **Automatic retries** with exponential backoff and provider fallback
 - **Auto library scan** so new episodes appear in Jellyfin immediately
-- **Jellyfin-compatible naming**: `Series Name/Season 01/Series Name - S01E01 - Episode Title.mkv`
+- **Jellyfin-compatible naming**: `Series Name/Season 01/Series Name - S01E01 - Episode Title.mkv` for episodes and `Movie Title/Movie Title.mkv` for movies
 
 ## Looking for more?
 
@@ -90,7 +90,7 @@ After installing, go to **Dashboard > Plugins > AniWorld Downloader** to configu
 | Auto-scan Library | Trigger a Jellyfin library scan when a download finishes |
 | Enable for non-admin users | Allow non-admin users to access the downloader via the sidebar (see [Non-admin access](#non-admin-access)) |
 | Proxy Server | Route all network requests and downloads through a proxy (e.g. `http://proxy:8080` or `socks5://proxy:1080`). Leave empty to connect directly. Requires a server restart after changing. |
-| Movie download path | Default save location for movies (should point to a Jellyfin library folder) |
+| Movie download path | Save location for movies across all sites (should point to a Jellyfin movie library folder). Also moves aniworld.to films out of their series' `Specials` folder. Set this if you use MegaKino or Moflix for both movies and series, so movies don't end up in your series library. |
 | Language Fallback order | When the requested language is unavailable, fall back to other languages in the chosen priority order (default: No Fallback) |
 
 ### Per-site settings

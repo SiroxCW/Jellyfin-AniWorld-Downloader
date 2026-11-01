@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.AniWorld.Configuration;
+using Jellyfin.Plugin.AniWorld.Helpers;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +20,9 @@ namespace Jellyfin.Plugin.AniWorld.Services;
 /// Matching is based on the sanitized series title (= folder name on disk) + season + episode,
 /// which is the same key used by the download and duplicate-detection logic.
 /// No URL guessing is needed — the folder name IS the sanitized title.
+/// The exception is an aniworld/s.to film in a dedicated movie path: "Film Title/Film Title.mkv"
+/// names neither the series nor the film number, so those come from the file's old record.
+/// Without an old record, the file is recorded under its own folder name.
 ///
 /// The task:
 /// 1. Reads all existing completed records (to preserve original episode URLs and metadata).
@@ -130,11 +134,12 @@ public class RebuildDownloadHistoryTask : IScheduledTask
         int totalFiles = 0;
         var processedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var countedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var recordedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         double progressPerTarget = 85.0 / scanTargets.Count;
         int targetIndex = 0;
 
-        foreach (var (basePath, language, source) in scanTargets)
+        foreach (var (basePath, language, source, isMoviePath) in scanTargets)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -152,13 +157,6 @@ public class RebuildDownloadHistoryTask : IScheduledTask
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Dedup by file+language — allows the same file to be recorded for multiple languages
-                var dedupeKey = $"{mkvFile}|{language}";
-                if (!processedKeys.Add(dedupeKey))
-                {
-                    continue;
-                }
-
                 if (countedFiles.Add(mkvFile))
                 {
                     totalFiles++;
@@ -172,35 +170,49 @@ public class RebuildDownloadHistoryTask : IScheduledTask
                     continue;
                 }
 
-                var (seriesName, season, episode) = parsed.Value;
+                var (seriesName, season, episode, isMovieLayout) = parsed.Value;
                 var fileInfo = new FileInfo(mkvFile);
+                var oldRecords = recordsByPath.GetValueOrDefault(mkvFile) ?? new List<DownloadHistoryRecord>();
 
-                // Try to preserve episode_url from an old record with the same language
-                var episodeUrl = string.Empty;
-                if (recordsByPath.TryGetValue(mkvFile, out var oldRecords))
+                // A movie path is shared by all languages, so the language comes from the file's
+                // old records. A file with no old record that another target already found keeps
+                // that record, rather than getting a language from the movie path's default.
+                var languages = isMoviePath && oldRecords.Count > 0
+                    ? oldRecords.Select(r => r.Language).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+                    : isMoviePath && recordedFiles.Contains(mkvFile)
+                        ? new List<string>()
+                        : new List<string> { language };
+
+                foreach (var recordLanguage in languages)
                 {
-                    var match = oldRecords.Find(r =>
-                        string.Equals(r.Language, language, StringComparison.OrdinalIgnoreCase));
-                    if (match != null)
+                    // Dedup by file+language — allows the same file to be recorded for multiple languages
+                    if (!processedKeys.Add($"{mkvFile}|{recordLanguage}"))
                     {
-                        episodeUrl = match.EpisodeUrl;
+                        continue;
                     }
+
+                    // Try to preserve the URL and source from an old record with the same language
+                    var match = oldRecords.Find(r =>
+                        string.Equals(r.Language, recordLanguage, StringComparison.OrdinalIgnoreCase));
+
+                    // A movie folder may not name the series or film number, so the old record wins.
+                    var keepsOldIdentity = isMovieLayout && match != null && !string.IsNullOrEmpty(match.SeriesTitle);
+
+                    // seriesName is the folder name which IS the sanitized title —
+                    // the same value that SanitizeFileName(originalTitle) produces.
+                    _historyService.InsertFileRecord(
+                        episodeUrl: match?.EpisodeUrl ?? string.Empty,
+                        seriesTitle: keepsOldIdentity ? match!.SeriesTitle : seriesName,
+                        season: keepsOldIdentity ? match!.Season : season,
+                        episode: keepsOldIdentity ? match!.Episode : episode,
+                        language: recordLanguage,
+                        outputPath: mkvFile,
+                        fileSizeBytes: fileInfo.Length,
+                        source: match?.Source ?? source);
+
+                    recordedFiles.Add(mkvFile);
+                    recordCount++;
                 }
-
-                // seriesName is the folder name which IS the sanitized title —
-                // the same value that SanitizeFileName(originalTitle) produces.
-                // Always use the CURRENT scan target's language, not the old record's.
-                _historyService.InsertFileRecord(
-                    episodeUrl: episodeUrl,
-                    seriesTitle: seriesName,
-                    season: season,
-                    episode: episode,
-                    language: language,
-                    outputPath: mkvFile,
-                    fileSizeBytes: fileInfo.Length,
-                    source: source);
-
-                recordCount++;
             }
 
             targetIndex++;
@@ -222,11 +234,11 @@ public class RebuildDownloadHistoryTask : IScheduledTask
     }
 
     /// <summary>
-    /// Collects all (basePath, language, source) tuples from the plugin configuration.
+    /// Collects all (basePath, language, source, isMoviePath) tuples from the plugin configuration.
     /// </summary>
-    private static List<(string BasePath, string Language, string Source)> CollectScanTargets(PluginConfiguration config)
+    private static List<(string BasePath, string Language, string Source, bool IsMoviePath)> CollectScanTargets(PluginConfiguration config)
     {
-        var targets = new List<(string, string, string)>();
+        var targets = new List<(string, string, string, bool)>();
         var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Helper to add a target, avoiding duplicate base paths with different languages
@@ -241,44 +253,25 @@ public class RebuildDownloadHistoryTask : IScheduledTask
             var key = $"{path}|{language}|{source}";
             if (seenPaths.Add(key))
             {
-                targets.Add((path, language, source));
+                targets.Add((path, language, source, false));
             }
         }
 
-        // AniWorld per-language paths
-        foreach (var (langKey, path) in config.AniWorldConfig.DownloadPaths)
+        foreach (var source in new[] { "aniworld", "sto", "filmo", "filmpalast", "megakino", "moflix" })
         {
-            AddTarget(path, langKey, "aniworld");
-        }
+            var siteConfig = config.GetSiteConfig(source);
 
-        // AniWorld general/legacy path
-        if (!string.IsNullOrEmpty(config.AniWorldConfig.DownloadPath))
-        {
-            AddTarget(config.AniWorldConfig.DownloadPath, config.GetPreferredLanguage("aniworld"), "aniworld");
-        }
+            // Per-language paths
+            foreach (var (langKey, path) in siteConfig.DownloadPaths)
+            {
+                AddTarget(path, langKey, source);
+            }
 
-        // STO per-language paths
-        foreach (var (langKey, path) in config.StoConfig.DownloadPaths)
-        {
-            AddTarget(path, langKey, "sto");
-        }
-
-        // STO general/legacy path
-        if (!string.IsNullOrEmpty(config.StoConfig.DownloadPath))
-        {
-            AddTarget(config.StoConfig.DownloadPath, config.GetPreferredLanguage("sto"), "sto");
-        }
-
-        // Filmo per-language paths
-        foreach (var (langKey, path) in config.FilmoConfig.DownloadPaths)
-        {
-            AddTarget(path, langKey, "filmo");
-        }
-
-        // Filmo general/legacy path
-        if (!string.IsNullOrEmpty(config.FilmoConfig.DownloadPath))
-        {
-            AddTarget(config.FilmoConfig.DownloadPath, config.GetPreferredLanguage("filmo"), "filmo");
+            // General/legacy site path
+            if (!string.IsNullOrEmpty(siteConfig.DownloadPath))
+            {
+                AddTarget(siteConfig.DownloadPath, config.GetPreferredLanguage(source), source);
+            }
         }
 
         // Legacy global DownloadPath
@@ -287,18 +280,31 @@ public class RebuildDownloadHistoryTask : IScheduledTask
             AddTarget(config.DownloadPath, config.PreferredLanguage, "aniworld");
         }
 
+        // Dedicated movie path. Must stay last: its language and source are only defaults
+        // for files that neither an old record nor another target can identify.
+        if (!string.IsNullOrEmpty(config.MovieDownloadPath))
+        {
+            targets.Add((config.MovieDownloadPath, config.PreferredLanguage, "aniworld", true));
+        }
+
         return targets;
     }
 
     /// <summary>
     /// Parses series name, season, and episode from a file path relative to the base download path.
-    /// Expected structure: {basePath}/{SeriesName}/Season XX/{file} - SXXEXX[...].mkv
+    /// Expected structure: {basePath}/{Title}/{Title}.mkv (movie layout, see <see cref="PathHelper.TryParseMovieFile"/>)
+    /// or: {basePath}/{SeriesName}/Season XX/{file} - SXXEXX[...].mkv
     /// or: {basePath}/{SeriesName}/Specials/{file} - S00EXX[...].mkv
     /// </summary>
-    private static (string SeriesName, int Season, int Episode)? ParseFileInfo(string basePath, string filePath)
+    private static (string SeriesName, int Season, int Episode, bool IsMovieLayout)? ParseFileInfo(string basePath, string filePath)
     {
         var relativePath = Path.GetRelativePath(basePath, filePath);
         var parts = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        if (PathHelper.TryParseMovieFile(parts, out var movieName, out var movieNumber))
+        {
+            return (movieName, 0, movieNumber, true);
+        }
 
         // Need at least: SeriesName / Season XX / filename.mkv
         if (parts.Length < 3)
@@ -334,6 +340,6 @@ public class RebuildDownloadHistoryTask : IScheduledTask
         }
 
         var episode = int.Parse(epMatch.Groups[2].Value);
-        return (seriesName, season, episode);
+        return (seriesName, season, episode, false);
     }
 }

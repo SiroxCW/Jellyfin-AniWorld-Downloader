@@ -194,6 +194,13 @@ public class DownloadService
             var taskId = Guid.NewGuid().ToString("N")[..12];
             var (season, episode) = PathHelper.ParseSeasonEpisode(episodeUrl);
 
+            // Failed and cancelled downloads delete the file at OutputPath, so a movie's
+            // path must be checked before it is queued, not just before it is written.
+            if (PathHelper.IsMovieSiteUrl(episodeUrl))
+            {
+                outputPath = ResolveMovieSitePath(outputPath, seriesTitle, season, episode, source);
+            }
+
             task = new DownloadTask
             {
                 Id = taskId,
@@ -232,6 +239,62 @@ public class DownloadService
         }
 
         return task.Id;
+    }
+
+    /// <summary>
+    /// Returns a path for a movie-site download that doesn't belong to another title.
+    /// Keeps the plain "Title/Title.mkv" path unless, for example, an aniworld film with
+    /// the same title is already there; then it uses "Title - source".
+    /// </summary>
+    private string ResolveMovieSitePath(string outputPath, string seriesTitle, int season, int episode, string source)
+    {
+        // Bounded because the ownership check stays true if the database can't be read.
+        var candidate = outputPath;
+        for (var attempt = 1;
+             attempt <= 10 && _historyService.IsOutputPathOwnedByOther(candidate, seriesTitle, season, episode);
+             attempt++)
+        {
+            candidate = PathHelper.AppendToMovieName(outputPath, attempt == 1 ? source : $"{source} {attempt}");
+        }
+
+        if (candidate != outputPath)
+        {
+            _logger.LogInformation("{Path} belongs to another title, using {NewPath}", outputPath, candidate);
+        }
+
+        return candidate;
+    }
+
+    /// <summary>
+    /// Renames an aniworld/s.to film's placeholder path to its real title, without taking
+    /// a path that belongs to another title. If both the title and "Series - Title" are
+    /// taken, the placeholder stays, because it is unique to this series and film.
+    /// </summary>
+    private void ApplyFilmTitleToOutputPath(DownloadTask task)
+    {
+        // The lock and the immediate save stop two workers claiming the same path.
+        lock (_queueLock)
+        {
+            var target = PathHelper.ApplyFilmTitle(task.OutputPath, task.SeriesTitle, task.EpisodeTitle, task.EpisodeUrl);
+            if (target == task.OutputPath)
+            {
+                return;
+            }
+
+            if (_historyService.IsOutputPathOwnedByOther(target, task.SeriesTitle, task.Season, task.Episode))
+            {
+                target = PathHelper.ApplyFilmTitle(task.OutputPath, task.SeriesTitle, task.EpisodeTitle, task.EpisodeUrl, prefixSeries: true);
+                if (_historyService.IsOutputPathOwnedByOther(target, task.SeriesTitle, task.Season, task.Episode))
+                {
+                    _logger.LogWarning("All title paths are taken for {Url}, keeping {Path}", task.EpisodeUrl, task.OutputPath);
+                    return;
+                }
+            }
+
+            task.OutputPath = target;
+            _historyService.UpdateDownload(task);
+            _logger.LogDebug("Updated output path with film title: {Path}", target);
+        }
     }
 
     /// <summary>
@@ -489,6 +552,8 @@ public class DownloadService
             task.OutputPath = newPath;
             _logger.LogDebug("Updated output path with episode title: {Path}", newPath);
         }
+
+        ApplyFilmTitleToOutputPath(task);
 
         if (!details.ProvidersByLanguage.TryGetValue(task.Language, out var providers) ||
             !providers.TryGetValue(task.Provider, out var redirectUrl))

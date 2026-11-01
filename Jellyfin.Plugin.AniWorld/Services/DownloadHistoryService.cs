@@ -311,6 +311,53 @@ public class DownloadHistoryService : IDisposable
     }
 
     /// <summary>
+    /// Checks whether a movie output path belongs to something other than the given title.
+    /// True if a live history record for the path has a different series or episode, or if
+    /// the file exists and no record of any status shows it is this title's own. A failed
+    /// record still counts as its own, because a restart can leave a partial file behind.
+    /// Also returns true if the database can't be read, so a file is never overwritten by mistake.
+    /// </summary>
+    public bool IsOutputPathOwnedByOther(string outputPath, string seriesTitle, int season, int episode)
+    {
+        lock (_dbLock)
+        {
+            try
+            {
+                var sanitizedTitle = PathHelper.SanitizeFileName(seriesTitle);
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT series_title, season, episode, status FROM download_history
+                    WHERE output_path = @path
+                ";
+                cmd.Parameters.AddWithValue("@path", outputPath);
+
+                var hasOwnRecord = false;
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    if (reader.GetString(0) == sanitizedTitle
+                        && reader.GetInt32(1) == season
+                        && reader.GetInt32(2) == episode)
+                    {
+                        hasOwnRecord = true;
+                    }
+                    else if (reader.GetString(3) is not ("Failed" or "Cancelled"))
+                    {
+                        return true;
+                    }
+                }
+
+                return !hasOwnRecord && File.Exists(outputPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to check ownership of output path {Path}", outputPath);
+                return true;
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets the download history, most recent first.
     /// </summary>
     public List<DownloadHistoryRecord> GetHistory(int limit = 50, int offset = 0, string? statusFilter = null, string? seriesFilter = null)

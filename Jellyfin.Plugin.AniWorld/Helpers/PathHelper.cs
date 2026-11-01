@@ -68,7 +68,15 @@ public static class PathHelper
     /// trailing /season).
     /// </summary>
     public static readonly Regex MoflixMovieFromUrl = new(
-        @"moflix-stream\.xyz/titles/\d+(?!/season)",
+        @"moflix-stream\.xyz/titles/\d+(?!\d|/season)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Matches the placeholder name of an aniworld/s.to film whose title is not known yet
+    /// ("{Series} - Film {NN}").
+    /// </summary>
+    private static readonly Regex FilmPlaceholderName = new(
+        @"^(?<series>.+) - Film (?<num>\d+)$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
@@ -84,8 +92,16 @@ public static class PathHelper
     /// </summary>
     public static bool IsMovieUrl(string url)
     {
-        return MovieFromUrl.IsMatch(url)
-            || FilmoMovieFromUrl.IsMatch(url)
+        return MovieFromUrl.IsMatch(url) || IsMovieSiteUrl(url);
+    }
+
+    /// <summary>
+    /// Returns true when the URL is a standalone movie on filmo.to, filmpalast.to,
+    /// megakino or moflix. Excludes aniworld/s.to films, which belong to a series.
+    /// </summary>
+    public static bool IsMovieSiteUrl(string url)
+    {
+        return FilmoMovieFromUrl.IsMatch(url)
             || FilmpalastMovieFromUrl.IsMatch(url)
             || MegaKinoMovieFromUrl.IsMatch(url)
             || MoflixMovieFromUrl.IsMatch(url);
@@ -152,9 +168,13 @@ public static class PathHelper
 
     /// <summary>
     /// Builds a Jellyfin-compatible output path from the episode URL.
-    /// Format: basePath/SeriesName/Season XX/SeriesName - SXXEXX.mkv
+    /// Episodes: basePath/SeriesName/Season XX/SeriesName - SXXEXX.mkv
+    /// Movies: basePath/Title/Title.mkv
+    /// aniworld/s.to films stay in the series folder (Specials) unless a dedicated movie
+    /// path is configured. In that case they get a placeholder movie folder here, which
+    /// <see cref="ApplyFilmTitle"/> renames once the film title is known.
     /// </summary>
-    public static string BuildOutputPath(string basePath, string seriesTitle, string episodeUrl)
+    public static string BuildOutputPath(string basePath, string seriesTitle, string episodeUrl, bool hasDedicatedMoviePath = false)
     {
         var safeName = SanitizeFileName(seriesTitle);
 
@@ -173,6 +193,12 @@ public static class PathHelper
         if (movieMatch.Success)
         {
             var num = int.Parse(movieMatch.Groups["num"].Value);
+
+            if (hasDedicatedMoviePath)
+            {
+                return BuildMoviePath(basePath, FilmPlaceholder(safeName, num), ".mkv");
+            }
+
             var fileName = $"{safeName} - S00E{num:D2}.mkv";
 
             return Path.Combine(basePath, safeName, "Specials", fileName);
@@ -200,17 +226,10 @@ public static class PathHelper
             return Path.Combine(basePath, safeName, "Season 01", fileName);
         }
 
-        // Movies on filmo.to / filmpalast.to / megakino / moflix: same layout
-        // as aniworld movies so the rebuild task can parse them back
-        // (Specials + S00E00).
-        if (FilmoMovieFromUrl.IsMatch(episodeUrl)
-            || FilmpalastMovieFromUrl.IsMatch(episodeUrl)
-            || MegaKinoMovieFromUrl.IsMatch(episodeUrl)
-            || MoflixMovieFromUrl.IsMatch(episodeUrl))
+        // Movies on filmo.to / filmpalast.to / megakino / moflix
+        if (IsMovieSiteUrl(episodeUrl))
         {
-            var fileName = $"{safeName} - S00E00.mkv";
-
-            return Path.Combine(basePath, safeName, "Specials", fileName);
+            return BuildMoviePath(basePath, safeName, ".mkv");
         }
 
         // Fallback: use slug + timestamp
@@ -237,18 +256,117 @@ public static class PathHelper
         var match = Regex.Match(fileName, @"^(.+ - S\d{2}E\d{2})$");
         if (match.Success)
         {
-            var safeTitle = SanitizeFileName(episodeTitle);
-            if (safeTitle.Length > 80)
-            {
-                // Truncate at word boundary, trim trailing punctuation
-                safeTitle = safeTitle[..77].TrimEnd(' ', '-', ',', '.', ';');
-                safeTitle += "...";
-            }
+            var safeTitle = SanitizeAndTruncateTitle(episodeTitle);
 
             var newName = $"{match.Groups[1].Value} - {safeTitle}{ext}";
             return Path.Combine(dir, newName);
         }
 
         return outputPath;
+    }
+
+    /// <summary>
+    /// Renames the placeholder movie folder and file of an aniworld/s.to film to its real title:
+    /// "basePath/Series - Film 01/Series - Film 01.mkv" becomes "basePath/Film Title/Film Title.mkv",
+    /// or "basePath/Series - Film Title/Series - Film Title.mkv" with <paramref name="prefixSeries"/>.
+    /// Returns the path unchanged for anything else, so it is safe to call again on a retry.
+    /// </summary>
+    public static string ApplyFilmTitle(string outputPath, string seriesTitle, string? filmTitle, string episodeUrl, bool prefixSeries = false)
+    {
+        var movieMatch = MovieFromUrl.Match(episodeUrl);
+        if (!movieMatch.Success || string.IsNullOrWhiteSpace(filmTitle) || filmTitle == "Unknown")
+        {
+            return outputPath;
+        }
+
+        var safeSeries = SanitizeFileName(seriesTitle);
+        var placeholder = FilmPlaceholder(safeSeries, int.Parse(movieMatch.Groups["num"].Value));
+        var movieDir = Path.GetDirectoryName(outputPath);
+        var basePath = Path.GetDirectoryName(movieDir);
+
+        if (basePath == null
+            || Path.GetFileName(movieDir) != placeholder
+            || Path.GetFileNameWithoutExtension(outputPath) != placeholder)
+        {
+            return outputPath;
+        }
+
+        // aniworld ends titles with a tag ("Title [Movie]", "Title [OVA]"), which would hurt Jellyfin's
+        // matching. A folder name must not end in a dot (Windows/SMB strip it), so drop the truncation "..."
+        var titleWithoutTag = Regex.Replace(filmTitle, @"\s*\[[^\]]*\]\s*$", string.Empty);
+        var safeTitle = SanitizeAndTruncateTitle(titleWithoutTag).TrimEnd('.', ' ');
+        if (safeTitle.Length == 0 || safeTitle == "Unknown")
+        {
+            return outputPath;
+        }
+
+        var name = prefixSeries ? $"{safeSeries} - {safeTitle}" : safeTitle;
+        return BuildMoviePath(basePath, name, Path.GetExtension(outputPath));
+    }
+
+    /// <summary>
+    /// Returns a variant of a "basePath/Title/Title.mkv" path with the given text added to both
+    /// the folder and the file name. Used when the plain path already belongs to something else.
+    /// </summary>
+    public static string AppendToMovieName(string outputPath, string suffix)
+    {
+        var movieDir = Path.GetDirectoryName(outputPath);
+        var basePath = Path.GetDirectoryName(movieDir);
+        var name = Path.GetFileNameWithoutExtension(outputPath);
+
+        return basePath == null || Path.GetFileName(movieDir) != name
+            ? outputPath
+            : BuildMoviePath(basePath, $"{name} - {suffix}", Path.GetExtension(outputPath));
+    }
+
+    /// <summary>
+    /// Parses a movie-layout file from its path parts relative to the download path:
+    /// "Series - Film 01/Series - Film 01.mkv" gives (Series, 1) and "Title/Title.mkv" gives (Title, 0).
+    /// The folder and file name must match, so any other file directly in a folder is rejected.
+    /// </summary>
+    public static bool TryParseMovieFile(string[] parts, out string seriesName, out int episode)
+    {
+        seriesName = string.Empty;
+        episode = 0;
+
+        if (parts.Length != 2
+            || !string.Equals(parts[0], Path.GetFileNameWithoutExtension(parts[1]), StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var placeholder = FilmPlaceholderName.Match(parts[0]);
+        if (placeholder.Success)
+        {
+            seriesName = placeholder.Groups["series"].Value;
+            episode = int.Parse(placeholder.Groups["num"].Value);
+            return true;
+        }
+
+        seriesName = parts[0];
+        return true;
+    }
+
+    private static string FilmPlaceholder(string safeSeriesName, int number)
+    {
+        return $"{safeSeriesName} - Film {number:D2}";
+    }
+
+    private static string BuildMoviePath(string basePath, string name, string extension)
+    {
+        return Path.Combine(basePath, name, name + extension);
+    }
+
+    private static string SanitizeAndTruncateTitle(string title)
+    {
+        var safeTitle = SanitizeFileName(title);
+        if (safeTitle.Length > 80)
+        {
+            // Truncate at word boundary, trim trailing punctuation
+            safeTitle = safeTitle[..77].TrimEnd(' ', '-', ',', '.', ';');
+            safeTitle += "...";
+        }
+
+        return safeTitle;
     }
 }

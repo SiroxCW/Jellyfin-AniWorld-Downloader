@@ -99,6 +99,15 @@ public class AniWorldController : ControllerBase
     }
 
     /// <summary>
+    /// Builds an output path, using the movie layout for aniworld/s.to films if a movie path is set.
+    /// </summary>
+    private static string BuildOutputPath(string basePath, string seriesTitle, string episodeUrl)
+    {
+        var hasDedicatedMoviePath = !string.IsNullOrEmpty(Plugin.Instance?.Configuration.MovieDownloadPath);
+        return PathHelper.BuildOutputPath(basePath, seriesTitle, episodeUrl, hasDedicatedMoviePath);
+    }
+
+    /// <summary>
     /// Resolves the source from an explicit parameter or URL auto-detection.
     /// </summary>
     private static string ResolveSource(string? explicitSource, string? url = null)
@@ -443,7 +452,7 @@ public class AniWorldController : ControllerBase
         var provider = request.Provider ?? config?.GetPreferredProvider(source) ?? "VOE";
         var seriesTitle = request.SeriesTitle ?? "Unknown";
 
-        var outputPath = PathHelper.BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl);
+        var outputPath = BuildOutputPath(basePath, seriesTitle, request.EpisodeUrl);
 
         // Check if already downloaded (duplicate detection)
         if (!request.Force)
@@ -558,7 +567,7 @@ public class AniWorldController : ControllerBase
                 continue;
             }
 
-            var outputPath = PathHelper.BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url);
+            var outputPath = BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url);
 
             var (checkSeason, checkEpisode) = PathHelper.ParseSeasonEpisode(ep.Url);
 
@@ -662,7 +671,7 @@ public class AniWorldController : ControllerBase
                     ? movieBasePath
                     : basePath;
 
-                var outputPath = PathHelper.BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url);
+                var outputPath = BuildOutputPath(effectiveBasePath, seriesTitle, ep.Url);
 
                 var (checkSeason, checkEpisode) = PathHelper.ParseSeasonEpisode(ep.Url);
 
@@ -702,7 +711,7 @@ public class AniWorldController : ControllerBase
 
             foreach (var ep in movies)
             {
-                var outputPath = PathHelper.BuildOutputPath(movieBasePath, seriesTitle, ep.Url);
+                var outputPath = BuildOutputPath(movieBasePath, seriesTitle, ep.Url);
 
                 var (movieSeason, movieEpisode) = PathHelper.ParseSeasonEpisode(ep.Url);
 
