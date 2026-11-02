@@ -198,12 +198,12 @@ public class AniWorldController : ControllerBase
 
     /// <summary>
     /// Fetches a provider cover on the Jellyfin server, so clients do not contact the host.
-    /// Note: image elements do not supply Jellyfin Authorization headers.
-    /// This endpoint is anonymous but permits only HTTPS URLs at known provider hosts,
-    /// with redirect handling disabled and a strict response size limit.
+    /// Image elements cannot send Jellyfin's Authorization header, so the web UI passes the
+    /// access token as the ApiKey query parameter instead. Only provider hosts accepted by
+    /// <see cref="UrlValidator"/> are fetched, redirects are not followed, and the response
+    /// must be an image within a strict size limit.
     /// </summary>
     [HttpGet("Cover")]
-    [AllowAnonymous]
     [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetCover([Required] string url, CancellationToken cancellationToken = default)
     {
@@ -212,9 +212,10 @@ public class AniWorldController : ControllerBase
             return NotFound();
         }
 
-        // Restrict to streaming source hosts. Prevent custom s.to base URLs from
-        // expanding the public image endpoint's allowed destinations.
-        if (!CoverUrlValidator.IsValid(url))
+        // Same host allowlist as scraping and downloads, including a custom s.to base URL.
+        // No file-extension check: some providers (e.g. filmo.to) serve covers from
+        // extensionless paths; the Content-Type check below enforces images instead.
+        if (!UrlValidator.IsValidUrl(url))
         {
             return BadRequest("Unsupported cover URL");
         }

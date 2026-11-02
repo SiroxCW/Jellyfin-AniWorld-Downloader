@@ -112,10 +112,12 @@ export default function (view, params) {
     }
 
     // A failed server-side image request must not trigger a direct-browser fallback.
+    // <img> cannot send the Authorization header, so the token goes in the query string
+    // (ApiKey, not the legacy api_key that newer Jellyfin versions can disable).
     function coverUrl(url) {
         if (!url) return '';
         return AW.proxyCoverImages !== false
-            ? ApiClient.getUrl('AniWorld/Cover', { url: url })
+            ? ApiClient.getUrl('AniWorld/Cover', { url: url, ApiKey: ApiClient.accessToken() })
             : url;
     }
 
