@@ -21,6 +21,14 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
+        serviceCollection.AddHttpClient("CoverImages", c => c.Timeout = TimeSpan.FromSeconds(15))
+            .ConfigurePrimaryHttpMessageHandler(services =>
+            {
+                var handler = ConfigureHandler(services);
+                if (handler is HttpClientHandler httpHandler) httpHandler.AllowAutoRedirect = false;
+                if (handler is SocketsHttpHandler socketsHandler) socketsHandler.AllowAutoRedirect = false;
+                return handler;
+            });
         serviceCollection.AddHttpClient("AniWorld", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))
             .ConfigurePrimaryHttpMessageHandler(ConfigureHandler);
         serviceCollection.AddHttpClient("STO", c => c.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds))

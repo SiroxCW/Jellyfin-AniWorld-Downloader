@@ -168,6 +168,16 @@
                                 <div class="fieldDescription">Message displayed to users when maintenance mode is active.</div>
                             </div>
 
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="chkProxyCoverImages" />
+                                    <span>Proxy cover images through Jellyfin</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Load supported provider cover images via the Jellyfin server instead of directly from this browser.
+                                    The server's VPN or configured network proxy is used for these requests.
+                                </div>
+                            </div>
                             <div class="inputContainer">
                                 <label class="inputLabel" for="txtProxyUrl">Proxy Server</label>
                                 <input is="emby-input" type="text" id="txtProxyUrl"

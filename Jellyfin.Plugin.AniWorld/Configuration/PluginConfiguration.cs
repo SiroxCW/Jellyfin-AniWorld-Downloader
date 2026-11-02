@@ -51,6 +51,9 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string ProxyUrl { get; set; } = string.Empty;
 
+    /// <summary>Route cover images through the Jellyfin server instead of the viewer's browser.</summary>
+    public bool ProxyCoverImages { get; set; } = true;
+
     /// <summary>
     /// Gets or sets a custom base URL for s.to (e.g. "https://s.to").
     /// Leave empty to use the default "https://serienstream.to".

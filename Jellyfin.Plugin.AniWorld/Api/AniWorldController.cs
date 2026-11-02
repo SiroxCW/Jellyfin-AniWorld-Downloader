@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Net.Mime;
+using System.Net.Http;
 using System.Reflection;
 using System.Security.Claims;
 using System.Threading;
@@ -37,6 +38,7 @@ public class AniWorldController : ControllerBase
     private readonly DownloadHistoryService _historyService;
     private readonly IServerConfigurationManager _configManager;
     private readonly ILogger<AniWorldController> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AniWorldController"/> class.
@@ -51,7 +53,8 @@ public class AniWorldController : ControllerBase
         DownloadService downloadService,
         DownloadHistoryService historyService,
         IServerConfigurationManager configManager,
-        ILogger<AniWorldController> logger)
+        ILogger<AniWorldController> logger,
+        IHttpClientFactory httpClientFactory)
     {
         _aniWorldService = aniWorldService;
         _stoService = stoService;
@@ -63,6 +66,7 @@ public class AniWorldController : ControllerBase
         _historyService = historyService;
         _configManager = configManager;
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
     }
 
     /// <summary>
@@ -195,9 +199,82 @@ public class AniWorldController : ControllerBase
             megakino = config?.MegaKinoConfig.Enabled ?? false,
             moflix = config?.MoflixConfig.Enabled ?? false,
             aniWorldOnlyGerman = config?.AniWorldConfig.OnlyGermanLanguages ?? false,
+            proxyCoverImages = config?.ProxyCoverImages ?? true,
             maintenanceMode = config?.MaintenanceMode ?? false,
             maintenanceMessage = config?.MaintenanceMessage ?? string.Empty
         });
+    }
+
+    /// <summary>
+    /// Fetches a provider cover on the Jellyfin server, so clients do not contact the host.
+    /// Image elements cannot send Jellyfin's Authorization header, so the web UI passes the
+    /// access token as the ApiKey query parameter instead. Only provider hosts accepted by
+    /// <see cref="UrlValidator"/> are fetched, redirects are not followed, and the response
+    /// must be an image within a strict size limit.
+    /// </summary>
+    [HttpGet("Cover")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
+    public async Task<IActionResult> GetCover([Required] string url, CancellationToken cancellationToken = default)
+    {
+        if (Plugin.Instance?.Configuration?.ProxyCoverImages == false)
+        {
+            return NotFound();
+        }
+
+        // Same host allowlist as scraping and downloads, including a custom s.to base URL.
+        // No file-extension check: some providers (e.g. filmo.to) serve covers from
+        // extensionless paths; the Content-Type check below enforces images instead.
+        if (!UrlValidator.IsValidUrl(url))
+        {
+            return BadRequest("Unsupported cover URL");
+        }
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var response = await _httpClientFactory.CreateClient("CoverImages")
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode((int)response.StatusCode);
+            }
+
+            const int maxBytes = 5 * 1024 * 1024;
+            if (response.Content.Headers.ContentLength > maxBytes)
+            {
+                return StatusCode(StatusCodes.Status413PayloadTooLarge);
+            }
+
+            var mime = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant();
+            if (mime != "image/jpeg" && mime != "image/png" && mime != "image/webp" && mime != "image/gif")
+            {
+                return StatusCode(StatusCodes.Status415UnsupportedMediaType);
+            }
+
+            await using var input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            await using var output = new MemoryStream();
+            var chunk = new byte[8192];
+            int n;
+            while ((n = await input.ReadAsync(chunk.AsMemory(), cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                if (output.Length + n > maxBytes)
+                {
+                    return StatusCode(StatusCodes.Status413PayloadTooLarge);
+                }
+                await output.WriteAsync(chunk.AsMemory(0, n), cancellationToken).ConfigureAwait(false);
+            }
+            return File(output.ToArray(), mime);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return StatusCode(StatusCodes.Status504GatewayTimeout);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Cover image download failed");
+            return StatusCode(StatusCodes.Status502BadGateway);
+        }
     }
 
     // ── Search & Browse ─────────────────────────────────────────────

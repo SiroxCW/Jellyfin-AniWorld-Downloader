@@ -41,6 +41,7 @@ export default function (view, params) {
             view.querySelector('#chkMaintenanceMode').checked = config.MaintenanceMode === true;
             view.querySelector('#txtMaintenanceMessage').value = config.MaintenanceMessage || '';
             view.querySelector('#txtProxyUrl').value = config.ProxyUrl || '';
+            view.querySelector('#chkProxyCoverImages').checked = config.ProxyCoverImages !== false;
             view.querySelector('#txtMoviePath').value = config.MovieDownloadPath || '';
             view.querySelector('#txtLanguageFallbackOrder').value = config.LanguageFallbackOrder || '1';
 
@@ -122,6 +123,7 @@ export default function (view, params) {
             config.MaintenanceMode = view.querySelector('#chkMaintenanceMode').checked;
             config.MaintenanceMessage = view.querySelector('#txtMaintenanceMessage').value.trim();
             config.ProxyUrl = view.querySelector('#txtProxyUrl').value.trim();
+            config.ProxyCoverImages = view.querySelector('#chkProxyCoverImages').checked;
             config.MovieDownloadPath = view.querySelector('#txtMoviePath').value.trim();
             config.LanguageFallbackOrder = view.querySelector('#txtLanguageFallbackOrder').value.trim() || '1';
 

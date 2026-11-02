@@ -111,6 +111,16 @@ export default function (view, params) {
         return ApiClient.getUrl('AniWorld/SiteLogo/' + (source || 'aniworld'));
     }
 
+    // A failed server-side image request must not trigger a direct-browser fallback.
+    // <img> cannot send the Authorization header, so the token goes in the query string
+    // (ApiKey, not the legacy api_key that newer Jellyfin versions can disable).
+    function coverUrl(url) {
+        if (!url) return '';
+        return AW.proxyCoverImages !== false
+            ? ApiClient.getUrl('AniWorld/Cover', { url: url, ApiKey: ApiClient.accessToken() })
+            : url;
+    }
+
     // CSS classes for the source badge: base class + a per-source pill background
     // (see .aw-badge-* rules in aniworld.html).
     function badgeClass(source) {
@@ -340,7 +350,7 @@ export default function (view, params) {
             items.forEach(function (item) {
                 var itemSource = item.Source || source || 'aniworld';
                 html += '<div class="aw-browse-card" onclick="window.AW.showSeries(\'' + encodeURIComponent(item.Url) + '\', \'' + escJs(item.Title) + '\', \'' + escJs(itemSource) + '\')">';
-                html += '<img class="aw-browse-cover" src="' + esc(item.CoverImageUrl) + '" alt="' + esc(item.Title) + '" loading="lazy" onerror="this.style.display=\'none\'" />';
+                html += '<img class="aw-browse-cover" src="' + esc(coverUrl(item.CoverImageUrl)) + '" alt="' + esc(item.Title) + '" loading="lazy" onerror="this.style.display=\'none\'" />';
                 var badgeCls = badgeClass(itemSource);
                 html += '<img class="' + badgeCls + '" src="' + siteLogoUrl(itemSource) + '" onerror="this.style.display=\'none\'" />';
                 html += '<div class="aw-browse-info">';
@@ -452,7 +462,7 @@ export default function (view, params) {
                 if (series.CoverImageUrl) {
                     var img = document.createElement('img');
                     img.className = 'aw-browse-cover';
-                    img.src = series.CoverImageUrl;
+                    img.src = coverUrl(series.CoverImageUrl);
                     img.alt = series.Title || '';
                     img.loading = 'lazy';
                     img.onerror = function () { this.style.display = 'none'; };
@@ -494,7 +504,7 @@ export default function (view, params) {
 
             html += '<div class="aw-series">';
             if (series.CoverImageUrl) {
-                html += '<img class="aw-cover" src="' + esc(series.CoverImageUrl) + '" alt="Cover" onerror="this.style.display=\'none\'" />';
+                html += '<img class="aw-cover" src="' + esc(coverUrl(series.CoverImageUrl)) + '" alt="Cover" onerror="this.style.display=\'none\'" />';
             }
             html += '<div class="aw-meta">';
             html += '<h2><img class="aw-source-logo" src="' + siteLogoUrl(source) + '" onerror="this.style.display=\'none\'" style="height:1.3em"> ' + esc(series.Title) + '</h2>';
@@ -1213,6 +1223,7 @@ export default function (view, params) {
         type: 'GET',
         dataType: 'json'
     }).then(function (sources) {
+        AW.proxyCoverImages = sources.proxyCoverImages !== false;
         AW.aniWorldOnlyGerman = sources.aniWorldOnlyGerman === true;
         AW.maintenanceMode = sources.maintenanceMode === true;
         if (AW.maintenanceMode) {
