@@ -1,108 +1,20 @@
 [
-  {
-    "guid": "e93d1d02-df60-4545-ae3c-7bb87dff024c",
-    "name": "AniWorld Downloader",
-    "overview": "Download anime from aniworld.to directly within Jellyfin",
-    "description": "Search, browse, and download anime from aniworld.to directly within Jellyfin. Supports VOE, Filemoon, Vidoza, and Vidmoly providers with German Dub, English Sub, and German Sub options.",
-    "owner": "SiroxCW",
-    "category": "General",
-    "versions": [
-      {
-        "version": "1.7.0.0",
-        "changelog": "v1.7.0.0\n- Feature: New movie sources \u2014 Filmo (filmo.to), FilmPalast, MegaKino and Moflix\n- Feature: UI rework \u2014 single Browse tab with provider switching (AniWorld, SerienStream, Filmo, FilmPalast, MegaKino, Moflix) and a \"Search All\" that queries every source at once\n- Feature: Tabbed settings page \u2014 one tab per site plus a General tab\n- UI: Mobile-optimized layout; emoji replaced with bundled Font Awesome icons (no CDN, works offline)\n- Change: Default s.to base URL is now https://serienstream.to (still changeable in settings)\n- Fix: Search and Search All buttons now always the same width",
-        "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.7.0.0/jellyfin-aniworld-downloader-v1.7.0.0.zip",
-        "checksum": "76f9c9dfb9665696c4b49ef7d599dfda",
-        "timestamp": "2026-09-30T12:11:42Z"
-      },
-      {
-        "version": "1.6.1.0",
-        "changelog": "v1.6.1.0\n- Added language fallback. Thanks to Alexius25 on GitHub\n- Removed remaining dead HiAnime code\n- Removed: FlareSolverr integration. s.to has moved its provider redirector behind a Cloudflare Turnstile widget that activates per-IP for flagged egress addresses. FlareSolverr cannot solve embedded Turnstile widgets that require user interaction, so the integration was not actually helping affected users. If your server's IP is gated, route the plugin's outbound traffic through a clean proxy via the existing Proxy Server setting (SOCKS5 / HTTP supported).",
-        "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.6.1.0/jellyfin-aniworld-downloader-v1.6.1.0.zip",
-        "checksum": "3400a811bb3a00ef9ee84f9f1c8a9937",
-        "timestamp": "2026-05-28T21:08:33Z"
-      },
-      {
-        "version": "1.6.0.0",
-        "changelog": "v1.6.0.0\n- Feature: Automatic DDoS-Guard / Cloudflare challenge bypass via optional FlareSolverr integration - solved cookies are cached and reused so the round-trip is only paid on a fresh challenge\n- Feature: Movie download support for s.to and aniworld.to (#17, thanks @Alexius25)\n- Feature: Force option to re-download episodes already marked as downloaded\n- Feature: SOCKS5 / HTTP proxy support for outbound traffic to streaming sites\n- Feature: Manual \"Rebuild download history\" scheduled task to resync the database with files on disk\n- Fix: Movie detection and downloading reliability\n- Fix: Removed legacy scheduled task that was a no-op",
-        "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.6.0.0/jellyfin-aniworld-downloader-v1.6.0.0.zip",
-        "checksum": "a321c4b5dd141bb15a2abf811aeee509",
-        "timestamp": "2026-05-05T19:58:39Z"
-      },
-      {
-        "version": "1.5.3.0",
-        "changelog": "v1.5.3.0\n- Feature: Configurable s.to base URL in plugin settings \u2014 use an alternative domain (e.g. serienstream.to) if s.to is blocked by your ISP\n- Fix: ffmpeg not found on Windows servers with custom Jellyfin install locations \u2014 removed hardcoded fallback paths in favor of Jellyfin's configured ffmpeg path",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.5.3.0/jellyfin-aniworld-downloader-v1.5.3.0.zip",
-        "checksum": "3c84d3b9b14d2ff0981771410fd36984",
-        "timestamp": "2026-03-22T12:13:01Z"
-      },
-      {
-        "version": "1.5.2.0",
-        "changelog": "v1.5.2.0\n- Fix: ffmpeg not found on Windows servers \u2014 now uses Jellyfin's own ffmpeg path via IMediaEncoder with fallback to platform-specific search",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.5.2.0/jellyfin-aniworld-downloader-v1.5.2.0.zip",
-        "checksum": "fff726a0f733c2ab41c0c21b93108f7e",
-        "timestamp": "2026-03-22T01:11:01Z"
-      },
-      {
-        "version": "1.5.1.0",
-        "changelog": "v1.5.1.0\n- Feature: Maintenance mode to block users from adding episodes to queue\n- Feature: Priority queueing for downloads\n- Feature: Display user and language for queue elements\n- Feature: Better formatted statistics in history view\n- Fix: Priority queue not properly displaying in the UI\n- Fix: Disabled HiAnime support (service discontinuing)\n- Fix: Removed bad symbols from filenames\n- Fix: Build error from misplaced constant declaration\n- Code cleanup: Extracted magic numbers into named constants",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.5.1.0/jellyfin-aniworld-downloader-v1.5.1.0.zip",
-        "checksum": "d76be9a7351f738124be6a0e13829114",
-        "timestamp": "2026-03-16T14:23:32Z"
-      },
-      {
-        "version": "1.5.0.0",
-        "changelog": "v1.5.0.0\n- Feature: HiAnime.to support for English dubbed anime\n- Feature: Sidebar access for non-admin users via File Transformation plugin\n- Feature: Separated download paths per language\n- Feature: Option to disable English-sub downloads for HiAnime and AniWorld\n- Feature: Option to force English-dub only downloads for HiAnime\n- Feature: HiAnime download merging for more accurate downloads\n- Fix: HiAnime wrong episode file naming\n- Fix: User downloader panel not responding if admin panel was used before\n- Fix: Narrowed folder selection for HiAnime to only HiAnime-accessible titles\n- Fix: Hidden irrelevant Download All button for HiAnime source titles\n- Fix: Various stability improvements",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.5.0.0/jellyfin-aniworld-downloader-v1.5.0.0.zip",
-        "checksum": "843dda2ce3787f6bf84465cd3aa2adfe",
-        "timestamp": "2026-03-11T21:38:48Z"
-      },
-      {
-        "version": "1.4.0.1",
-        "changelog": "v1.4.0.1\n- Change default AniWorld provider to Vidmoly (faster downloads) with VOE as fallback\n- Set default s.to provider to VOE\n- Improved README documentation",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.4.0.1/jellyfin-aniworld-downloader-v1.4.0.1.zip",
-        "checksum": "b795e1224e544c01a29328bf89d45afa",
-        "timestamp": "2026-03-06T18:39:47Z"
-      },
-      {
-        "version": "1.4.0.0",
-        "changelog": "v1.4.0.0\n- Feature: s.to series download support\n- Fix: Enable s.to downloader by default\n- Fix: Pass season language selection to single episode downloads\n- Fix: Prevent duplicate downloads when retrying a failed episode that was re-queued\n- Fix: Cleanup empty directories even when download file was never created\n- Fix: Cleanup base path for per-site configs, SQLite thread safety, and minor issues\n- Fix: Queue display order, cleanup, and race conditions",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.4.0.0/jellyfin-aniworld-downloader-v1.4.0.0.zip",
-        "checksum": "fd161a64069968e76edaab99194e8ffd",
-        "timestamp": "2026-03-06T18:14:42Z"
-      },
-      {
-        "version": "1.3.2.0",
-        "changelog": "v1.3.2.0\n- Feature: Improved download queue display (downloads tab)\n- Feature: Language indicator in title detail view\n- Feature: More user-friendly title detail view\n- Feature: Episodes refresh when navigating back to title\n- Fix: Same episode could be queued multiple times\n- Fix: Changing language by redownloading didn't work if language was used before\n- Fix: Missing downloaded info in title detail view\n- Fix: Download progress not reaching 100% in UI",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.3.2.0/jellyfin-aniworld-downloader-v1.3.2.0.zip",
-        "checksum": "a7dcc6715aeb6b7e4a8178c1d4ef65a8",
-        "timestamp": "2026-03-05T14:44:37Z"
-      },
-      {
-        "version": "1.3.1.0",
-        "changelog": "v1.3.1.0\n- Wider Jellyfin compatibility (10.9.0+, down from 10.11.0)\n- Jellyfin plugin repository support for easy install and updates\n- Automated release pipeline via GitHub Actions",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.3.1.0/jellyfin-aniworld-downloader-v1.3.1.0.zip",
-        "checksum": "b47b2c7078db66712e0907021468f7c0",
-        "timestamp": "2026-03-04T19:14:40Z"
-      },
-      {
-        "version": "1.3.0.0",
-        "changelog": "v1.3.0.0\n- Removed automatic update check (updates tracked via Jellyfin plugin repo)\n- Fix: Unicode smart quotes in filenames normalized to ASCII\n- Fix: Brackets stripped from filenames (e.g. [Final Episode])\n- Repository link now always visible (hardcoded)\n\nv1.2.0.0\n- Feature: Repository link button (GitHub icon) in header\n- Feature: Update check \u2014 shows banner when new version available\n- Feature: Update check toggle + repo URL in settings\n- Fix: Clear completed button spacing to download items\n\nv1.1.0.0\n- Security: SSRF protection \u2014 all API endpoints reject non-aniworld.to URLs\n- Security: ffmpeg argument injection prevention via ArgumentList API\n- Security: XSS hardening with escJs() helper\n- Code cleanup: shared PathHelper, removed dead code\n- Feature: Browse tab with Popular and New Releases sections\n- Feature: Cover image grid with lazy loading and hover effects\n\nv1.0.0.0\n- Fix: HTML entities in episode titles fully decoded\n- Feature: Download All Seasons\n- Feature: Fallback provider + sidebar navigation link\n\nv0.3.0.0\n- Fix: Settings link added to main plugin page for easy access\n- Fix: Downloaded status now verifies file exists on disk (handles deleted files)\n- Fix: Cancelled downloads now properly clean up partial files from filesystem\n\nv0.2.0.0\n- Fix: Version now displays correctly in Jellyfin plugin list\n- Fix: Download All now uses preferred language from settings + language selector\n- Fix: Season switch race condition resolved\n- Fix: Special characters in filenames sanitized\n\nv0.1.0.0 - Initial release\n- Search for anime on aniworld.to\n- Browse seasons and episodes\n- Download episodes via VOE, Vidoza, or Vidmoly\n- Track download progress\n- Plugin configuration page",
-        "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/releases/download/v1.3.0.0/jellyfin-aniworld-downloader-v1.3.0.0.zip",
-        "checksum": "b2b811f1692400dd3845c337db6d5cc5",
-        "timestamp": "2026-03-04T17:11:18Z"
-      }
-    ]
-  }
+    {
+        "guid":  "3f8c5c7e-85a2-4a0b-9dfb-9db692b1a457",
+        "name":  "HiAnime Downloader",
+        "description":  "Searches, stream-extracts, and downloads anime series and episodes from HiAnime directly into the Jellyfin media library with an embedded dashboard GUI.",
+        "overview":  "HiAnime downloader and dashboard GUI for Jellyfin Server.",
+        "owner":  "Jellyfin Community",
+        "category":  "General",
+        "versions":  [
+                         {
+                             "version":  "1.0.0.0",
+                             "changelog":  "Initial release: HiAnime search, stream extractor (MegaCloud AES-256-CBC), multi-segment HLS downloader, FFmpeg remuxer, WebVTT subtitle embedder, Jellyfin anime naming, and dashboard Web GUI.",
+                             "targetAbi":  "10.9.0.0",
+                             "sourceUrl":  "https://raw.githubusercontent.com/Tyljoe/jellyfin-plugin-hianime/main/dist/Jellyfin.Plugin.HiAnime_1.0.0.0.zip",
+                             "checksum":  "379fd10c709b98d6e91ca0cf74d94bba",
+                             "timestamp":  "2026-11-10T17:20:07Z"
+                         }
+                     ]
+    }
 ]
