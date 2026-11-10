@@ -168,6 +168,14 @@ Because the gate requires a real browser to solve an interactive Turnstile widge
 
 To check whether your server's IP is flagged, the repo includes [`scripts/check-sto-flag.sh`](scripts/check-sto-flag.sh): copy it to the server and run it.
 
+## Contributors
+
+Thank you to everyone who reports issues, shares ideas, and contributes code.
+
+<a href="https://github.com/SiroxCW/Jellyfin-AniWorld-Downloader/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=SiroxCW/Jellyfin-AniWorld-Downloader" alt="Jellyfin AniWorld Downloader contributors" />
+</a>
+
 ## Other Cool Projects
 - **[AniBridge](https://github.com/Zzackllack/AniBridge)** by **[Zzackllack](https://github.com/Zzackllack)** — a minimal FastAPI service bridging anime and series catalogues (AniWorld, SerienStream/s.to, MegaKino) with automation tools.
 
@@ -178,5 +186,7 @@ Jellyfin AniWorld Downloader is a **client-side** tool that enables access to co
 This software is **not intended to promote piracy or copyright infringement**. You are solely responsible for how you use Jellyfin AniWorld Downloader and for ensuring that your use **complies with applicable laws** and the **terms of service of the websites you access**.
 
 ## License
+
+Original Author: [SiroxCW](https://github.com/SiroxCW)
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).
